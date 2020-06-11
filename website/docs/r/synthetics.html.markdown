@@ -164,6 +164,6 @@ $ terraform import datadog_synthetics_test.fizz abc-123-xyz
 
 Support for Synthetics Browser test is limited to creating shallow Synthetics Browser test (cf. [example usage below](#example-usage-synthetics-browser-test-))
 
-You cannot create/edit/delete steps or assertions via Terraform unless you use [Datadog WebUI](https://app.datadoghq.com/synthetics/list) in conjunction with Terraform.
+You cannot create/edit/delete steps or assertions via this provider unless you use [Datadog WebUI](https://app.datadoghq.com/synthetics/list) in conjunction with the provider.
 
 We are considering adding support for Synthetics Browser test steps and assertions in the future but can't share any release date on that matter.

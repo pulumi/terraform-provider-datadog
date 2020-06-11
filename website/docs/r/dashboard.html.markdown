@@ -18,7 +18,7 @@ Provides a Datadog dashboard resource. This can be used to create and manage Dat
 ```hcl
 resource "datadog_dashboard" "ordered_dashboard" {
   title         = "Ordered Layout Dashboard"
-  description   = "Created using the Datadog provider in Terraform"
+  description   = "Created using the Datadog provider in TF"
   layout_type   = "ordered"
   is_read_only  = true
 
@@ -431,7 +431,7 @@ resource "datadog_dashboard" "ordered_dashboard" {
 ```hcl
 resource "datadog_dashboard" "free_dashboard" {
   title         = "Free Layout Dashboard"
-  description   = "Created using the Datadog provider in Terraform"
+  description   = "Created using the Datadog provider in TF"
   layout_type   = "free"
   is_read_only  = false
 

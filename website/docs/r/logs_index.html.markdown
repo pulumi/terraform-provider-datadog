@@ -13,7 +13,7 @@ Provides a Datadog [Logs Index API](https://docs.datadoghq.com/api/v1/logs-index
 ## Example Usage
 
 A sample Datadog logs index resource definition. Note that at this point, it is not possible to create new logs indexes
-through Terraform, so the `name` field must match a name of an already existing index. If you want to keep the current
+through this provider, so the `name` field must match a name of an already existing index. If you want to keep the current
 state of the index, we suggest importing it (see below).
 
 ```hcl

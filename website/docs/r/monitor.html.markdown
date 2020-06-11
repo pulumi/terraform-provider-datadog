@@ -59,7 +59,7 @@ The following arguments are supported:
     * `log alert`
 * `name` - (Required) Name of Datadog monitor
 * `query` - (Required) The monitor query to notify on. Note this is not the same query you see in the UI and
-    the syntax is different depending on the monitor `type`, please see the [API Reference](https://docs.datadoghq.com/api/v1/monitors/#create-a-monitor) for details. **Warning:** `terraform plan` won't perform any validation of the query contents.
+    the syntax is different depending on the monitor `type`, please see the [API Reference](https://docs.datadoghq.com/api/v1/monitors/#create-a-monitor) for details. **Warning:** `pulumi preview` won't perform any validation of the query contents.
 * `message` - (Required) A message to include with notifications for this monitor.
     Email notifications can be sent to specific users by using the same '@username' notation as events.
 * `escalation_message` - (Optional) A message to include with a re-notification. Supports the '@username'
@@ -118,7 +118,7 @@ The following arguments are supported:
 * `threshold_windows` (Optional) A mapping containing `recovery_window` and `trigger_window` values, e.g. `last_15m`. Can only be used for, and are required for, anomaly monitors.
   * `recovery_window` describes how long an anomalous metric must be normal before the alert recovers.
   * `trigger_window`  describes how long a metric must be anomalous before an alert triggers.
-* `silenced` (Optional) Each scope will be muted until the given POSIX timestamp or forever if the value is 0. Use `-1` if you want to unmute the scope. **Deprecated** The `silenced` parameter is being deprecated in favor of the downtime resource. This will be removed in the next major version of the Terraform Provider.
+* `silenced` (Optional) Each scope will be muted until the given POSIX timestamp or forever if the value is 0. Use `-1` if you want to unmute the scope. **Deprecated** The `silenced` parameter is being deprecated in favor of the downtime resource.
 
     To mute the alert completely:
 
@@ -132,15 +132,8 @@ The following arguments are supported:
           "role:db" = 1412798116
         }
 
-    Note: due to [HCL limitations](https://github.com/hashicorp/terraform/issues/2042), it is impossible to use interpolations in keys.
-    For example, the following will result in muting the scope `role:${var:role}` (no interpolation is done):
-
-        silenced = {
-            "role:${var:role}" = 0
-        }
-
-    To workaround this, you can use the [map function](https://www.terraform.io/docs/configuration/functions/map.html) of HCL:
-
+    Or, when using interpolation:
+    
         silenced = ${map("role:${var:role}", 0)}
 
 ## Silencing by Hand and by Downtimes
@@ -150,7 +143,7 @@ There are two ways how to silence a single monitor:
 * Mute it by hand
 * Create a Downtime
 
-Both of these actions add a new value to the `silenced` map. This can be problematic if the `silenced` attribute doesn't contain them in your Terraform, as they would be removed on next `terraform apply` invocation. In order to prevent that from happening, you can add following to your monitor:
+Both of these actions add a new value to the `silenced` map. This can be problematic if the `silenced` attribute doesn't contain them in your application, as they would be removed on next `pulumi up` invocation. In order to prevent that from happening, you can add following to your monitor:
 
 ```
 lifecycle {

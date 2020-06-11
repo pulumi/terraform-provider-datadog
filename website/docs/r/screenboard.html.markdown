@@ -46,7 +46,7 @@ resource "datadog_screenboard" "acceptance_test" {
     type        = "timeseries"
     x           = 25
     y           = 5
-    title       = "graph title terraform"
+    title       = "graph title tf"
     title_size  = 16
     title_align = "right"
     legend      = true
@@ -152,7 +152,7 @@ resource "datadog_screenboard" "acceptance_test" {
     type        = "query_value"
     x           = 45
     y           = 25
-    title       = "query value title terraform"
+    title       = "query value title tf"
     title_size  = 20
     title_align = "center"
     legend      = true
@@ -197,7 +197,7 @@ resource "datadog_screenboard" "acceptance_test" {
     type        = "toplist"
     x           = 65
     y           = 5
-    title       = "toplist title terraform"
+    title       = "toplist title tf"
     legend      = true
     legend_size = "auto"
 
@@ -230,7 +230,7 @@ resource "datadog_screenboard" "acceptance_test" {
     type  = "change"
     x     = 85
     y     = 5
-    title = "change title terraform"
+    title = "change title tf"
 
     tile_def {
       viz = "change"
@@ -251,7 +251,7 @@ resource "datadog_screenboard" "acceptance_test" {
     type  = "event_timeline"
     x     = 105
     y     = 5
-    title = "event_timeline title terraform"
+    title = "event_timeline title tf"
     query = "status:error"
 
     time = {
@@ -263,7 +263,7 @@ resource "datadog_screenboard" "acceptance_test" {
     type       = "event_stream"
     x          = 115
     y          = 5
-    title      = "event_stream title terraform"
+    title      = "event_stream title tf"
     query      = "*"
     event_size = "l"
 
@@ -276,7 +276,7 @@ resource "datadog_screenboard" "acceptance_test" {
     type   = "image"
     x      = 145
     y      = 5
-    title  = "image title terraform"
+    title  = "image title tf"
     sizing = "fit"
     margin = "large"
     url    = "https://datadog-prod.imgix.net/img/dd_logo_70x75.png"
@@ -299,7 +299,7 @@ resource "datadog_screenboard" "acceptance_test" {
     type     = "alert_graph"
     x        = 185
     y        = 5
-    title    = "alert graph title terraform"
+    title    = "alert graph title tf"
     alert_id = "123456"
     viz_type = "toplist"
 
@@ -312,7 +312,7 @@ resource "datadog_screenboard" "acceptance_test" {
     type       = "alert_value"
     x          = 205
     y          = 5
-    title      = "alert value title terraform"
+    title      = "alert value title tf"
     alert_id   = "123456"
     text_size  = "fill_height"
     text_align = "right"
@@ -617,7 +617,7 @@ Nested `widget` `tile_def` `request` blocks have the following structure (exactl
 - `increase_good` - (Optional, only for widgets of type "change") Boolean indicating whether an increase in the value is good (thus displayed in green) or not (thus displayed in red).
 - `style` - (Optional, only for widgets of type "timeseries", "query_value", "toplist", "process") describing how to display the widget. The structure of this block is described below. At most one such block should be present in a given request block.
 - `conditional_format` - (Optional) Nested block to customize the style if certain conditions are met. Currently only applies to `Query Value` and `Top List` type graphs.
-* `metadata_json` - (Optional) A JSON blob (preferrably created using [jsonencode](https://www.terraform.io/docs/configuration/functions/jsonencode.html)) representing mapping of query expressions to alias names. Note that the query expressions in `metadata_json` will be ignored if they're not present in the query. For example, this is how you define `metadata_json` with Terraform >= 0.12:
+* `metadata_json` - (Optional) A JSON blob representing mapping of query expressions to alias names. Note that the query expressions in `metadata_json` will be ignored if they're not present in the query. For example:
   ```
   metadata_json = jsonencode({
     "avg:redis.info.latency_ms{$host}": {
@@ -625,23 +625,7 @@ Nested `widget` `tile_def` `request` blocks have the following structure (exactl
     }
   })
   ```
-  And here's how you define `metadata_json` with Terraform < 0.12:
-  ```
-  variable "my_metadata" {
-    default = {
-      "avg:redis.info.latency_ms{$host}" = {
-        "alias": "Redis latency"
-      }
-    }
-  }
-
-  resource "datadog_screenboard" "SomeScreenboard" {
-    ...
-          metadata_json = "${jsonencode(var.my_metadata)}"
-  }
-  ```
-  Note that this has to be a JSON blob because of [limitations](https://github.com/hashicorp/terraform/issues/6215) of Terraform's handling complex nested structures. This is also why the key is called `metadata_json` even though it sets `metadata` attribute on the API call.
-
+ 
 ### Nested `widget` `tile_def` `request` `style` block
 
 Only for widgets of type "timeseries", "query_value", "toplist", "process".

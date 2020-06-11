@@ -21,7 +21,7 @@ resource "datadog_dashboard_list" "new_list" {
 		"datadog_dashboard.time"
 	]
 
-    name = "Terraform Created List"
+    name = "TF Created List"
     dash_item {
         type = "custom_timeboard"
         dash_id = "${datadog_dashboard.time.id}"
@@ -34,7 +34,7 @@ resource "datadog_dashboard_list" "new_list" {
 
 resource "datadog_dashboard" "time" {
 	title         = "TF Test Layout Dashboard"
-	description   = "Created using the Datadog provider in Terraform"
+	description   = "Created using the Datadog provider in TF"
 	layout_type   = "ordered"
 	is_read_only  = true
 	widget {
@@ -52,7 +52,7 @@ resource "datadog_dashboard" "time" {
 
 resource "datadog_dashboard" "screen" {
 	title         = "TF Test Free Layout Dashboard"
-	description   = "Created using the Datadog provider in Terraform"
+	description   = "Created using the Datadog provider in TF"
 	layout_type   = "free"
 	is_read_only  = false
 	widget {
