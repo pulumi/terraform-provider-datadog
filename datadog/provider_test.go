@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/dnaeon/go-vcr/recorder"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/logging"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/terraform"
 	"github.com/jonboulle/clockwork"
@@ -100,7 +102,7 @@ func removeURLSecrets(u *url.URL) *url.URL {
 	return u
 }
 
-func initAccProvider(t *testing.T) (*schema.Provider, func(t *testing.T)) {
+func initRecorder(t *testing.T) *recorder.Recorder {
 	var mode recorder.Mode
 	if isRecording() {
 		mode = recorder.ModeRecording
@@ -129,25 +131,25 @@ func initAccProvider(t *testing.T) (*schema.Provider, func(t *testing.T)) {
 		i.Request.Headers.Del("Dd-Application-Key")
 		return nil
 	})
-
-	p := Provider().(*schema.Provider)
-	p.ConfigureFunc = testProviderConfigure(rec)
-
-	cleanup := func(t *testing.T) {
-		rec.Stop()
-	}
-	return p, cleanup
+	return rec
 }
 
-func testProviderConfigure(r *recorder.Recorder) schema.ConfigureFunc {
+func initAccProvider(t *testing.T, httpClient *http.Client) *schema.Provider {
+
+	p := Provider().(*schema.Provider)
+	p.ConfigureFunc = testProviderConfigure(httpClient)
+
+	return p
+}
+
+func testProviderConfigure(httpClient *http.Client) schema.ConfigureFunc {
 	return func(d *schema.ResourceData) (interface{}, error) {
 		communityClient := datadogCommunity.NewClient(d.Get("api_key").(string), d.Get("app_key").(string))
 		if apiURL := d.Get("api_url").(string); apiURL != "" {
 			communityClient.SetBaseUrl(apiURL)
 		}
 
-		c := cleanhttp.DefaultClient()
-		c.Transport = logging.NewTransport("Datadog", r)
+		c := httpClient
 		communityClient.HttpClient = c
 		communityClient.ExtraHeader["User-Agent"] = fmt.Sprintf("Datadog/%s/terraform (%s)", version.ProviderVersion, runtime.Version())
 
@@ -229,11 +231,20 @@ func testProviderConfigure(r *recorder.Recorder) schema.ConfigureFunc {
 	}
 }
 
-func testAccProviders(t *testing.T) (map[string]terraform.ResourceProvider, func(t *testing.T)) {
-	provider, cleanup := initAccProvider(t)
+func testAccProvidersWithHttpClient(t *testing.T, httpClient *http.Client) map[string]terraform.ResourceProvider {
+	provider := initAccProvider(t, httpClient)
 	return map[string]terraform.ResourceProvider{
 		"datadog": provider,
-	}, cleanup
+	}
+}
+
+func testAccProviders(t *testing.T) (map[string]terraform.ResourceProvider, func(t *testing.T)) {
+	rec := initRecorder(t)
+	c := cleanhttp.DefaultClient()
+	c.Transport = logging.NewTransport("Datadog", rec)
+	return testAccProvidersWithHttpClient(t, c), func(t *testing.T) {
+		rec.Stop()
+	}
 }
 
 func testAccProvider(t *testing.T, accProviders map[string]terraform.ResourceProvider) *schema.Provider {
@@ -245,8 +256,11 @@ func testAccProvider(t *testing.T, accProviders map[string]terraform.ResourcePro
 }
 
 func TestProvider(t *testing.T) {
-	accProvider, cleanup := initAccProvider(t)
-	defer cleanup(t)
+	rec := initRecorder(t)
+	defer rec.Stop()
+	c := cleanhttp.DefaultClient()
+	c.Transport = logging.NewTransport("Datadog", rec)
+	accProvider := initAccProvider(t, c)
 
 	if err := accProvider.InternalValidate(); err != nil {
 		t.Fatalf("err: %s", err)
@@ -266,5 +280,71 @@ func testAccPreCheck(t *testing.T) {
 	}
 	if !isAPPKeySet() {
 		t.Fatal("DD_APP_KEY must be set for acceptance tests")
+	}
+}
+
+func testCheckResourceAttrs(name string, checkExists resource.TestCheckFunc, assertions []string) []resource.TestCheckFunc {
+	funcs := []resource.TestCheckFunc{}
+	funcs = append(funcs, checkExists)
+	for _, assertion := range assertions {
+		assertionPair := strings.Split(assertion, " = ")
+		if len(assertionPair) == 1 {
+			assertionPair = strings.Split(assertion, " =")
+		}
+		key := assertionPair[0]
+		value := ""
+		if len(assertionPair) > 1 {
+			value = assertionPair[1]
+		}
+		funcs = append(funcs, resource.TestCheckResourceAttr(name, key, value))
+		// Use utility method below, instead of the above one, to print out all state keys/values during test debugging
+		//funcs = append(funcs, CheckResourceAttr(name, key, value))
+	}
+	return funcs
+}
+
+/* Utility method for Debugging purpose. This method helps list assertions as well
+It is a duplication of `resource.TestCheckResourceAttr` into which we added print statements.
+*/
+func CheckResourceAttr(name, key, value string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		ms := s.RootModule()
+		rs, ok := ms.Resources[name]
+		if !ok {
+			return nil
+		}
+
+		is := rs.Primary
+		if is == nil {
+			return nil
+		}
+
+		for k, val := range is.Attributes {
+			fmt.Println(fmt.Sprintf("%v = %v", k, val))
+		}
+
+		// Empty containers may be elided from the state.
+		// If the intent here is to check for an empty container, allow the key to
+		// also be non-existent.
+		emptyCheck := value == "0" && (strings.HasSuffix(key, ".#") || strings.HasSuffix(key, ".%"))
+
+		if v, ok := is.Attributes[key]; !ok || v != value {
+
+			if emptyCheck && !ok {
+				return nil
+			}
+
+			if !ok {
+				return fmt.Errorf("%s: Attribute '%s' not found", name, key)
+			}
+
+			return fmt.Errorf(
+				"%s: Attribute '%s' expected %#v, got %#v",
+				name,
+				key,
+				value,
+				v)
+		}
+		return nil
 	}
 }
