@@ -2,8 +2,6 @@ package datadog
 
 import (
 	"testing"
-
-	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
 )
 
 // JSON export used as test scenario
@@ -370,58 +368,58 @@ resource "datadog_dashboard" "timeseries_dashboard" {
 				}
 				display_type = "line"
 			}
-			//request {
-			//	style {
-			//		line_width = "normal"
-			//		palette = "orange"
-			//		line_type = "solid"
-			//	}
-			//	display_type = "area"
-			//	network_query {
-			//		index = "netflow-search"
-			//		search {
-			//			query = "network.transport:udp network.destination.ip:\"*\""
-			//		}
-			//		group_by {
-			//			facet = "source_region"
-			//		}
-			//		group_by {
-			//			facet = "dest_environment"
-			//		}
-			//		compute {
-			//			facet = "network.bytes_read"
-			//			aggregation = "sum"
-			//		}
-			//	}
-			//}
-			//request {
-			//	style {
-			//		line_width = "normal"
-			//		palette = "grey"
-			//		line_type = "solid"
-			//	}
-			//	rum_query {
-			//		index = "*"
-			//		search {
-			//			query = ""
-			//		}
-			//		group_by {
-			//			facet = "service"
-			//			sort = {
-			//				facet = "@duration"
-			//				aggregation = "avg"
-			//				order = "desc"
-			//			}
-			//			limit = "10"
-			//		}
-			//		compute {
-			//			facet = "@duration"
-			//			interval = "10"
-			//			aggregation = "avg"
-			//		}
-			//	}
-			//	display_type = "area"
-			//}
+			request {
+				style {
+					line_width = "normal"
+					palette = "orange"
+					line_type = "solid"
+				}
+				display_type = "area"
+				network_query {
+					index = "netflow-search"
+					search = {
+						query = "network.transport:udp network.destination.ip:\"*\""
+					}
+					group_by {
+						facet = "source_region"
+					}
+					group_by {
+						facet = "dest_environment"
+					}
+					compute = {
+						facet = "network.bytes_read"
+						aggregation = "sum"
+					}
+				}
+			}
+			request {
+				style {
+					line_width = "normal"
+					palette = "grey"
+					line_type = "solid"
+				}
+				rum_query {
+					index = "*"
+					search = {
+						query = ""
+					}
+					group_by {
+						facet = "service"
+						sort = {
+							facet = "@duration"
+							aggregation = "avg"
+							order = "desc"
+						}
+						limit = "10"
+					}
+					compute = {
+						facet = "@duration"
+						interval = "10"
+						aggregation = "avg"
+					}
+				}
+				display_type = "area"
+			}
 			//request {
 			//	style {
 			//		line_width = "normal"
@@ -505,7 +503,7 @@ var datadogDashboardTimeseriesAsserts = []string{
 	"widget.0.timeseries_definition.0.marker.1.label = y=400000",
 	"widget.0.timeseries_definition.0.marker.1.display_type = warning dashed",
 	"widget.0.timeseries_definition.0.marker.1.value = y=400000",
-	"widget.0.timeseries_definition.0.request.# = 4",
+	"widget.0.timeseries_definition.0.request.# = 6",
 	"widget.0.timeseries_definition.0.request.0.style.0.line_width = thin",
 	"widget.0.timeseries_definition.0.request.0.style.0.line_type = solid",
 	"widget.0.timeseries_definition.0.request.0.process_query.# = 0",
@@ -576,46 +574,47 @@ var datadogDashboardTimeseriesAsserts = []string{
 	"widget.0.timeseries_definition.0.request.3.apm_query.# = 0",
 	"widget.0.timeseries_definition.0.request.3.style.0.palette = purple",
 	"widget.0.timeseries_definition.0.request.3.style.0.line_width = normal",
+	"widget.0.timeseries_definition.0.request.5.rum_query.0.group_by.0.sort.% = 3",
+	"widget.0.timeseries_definition.0.request.4.network_query.0.group_by.0.facet = source_region",
+	"widget.0.timeseries_definition.0.request.4.network_query.0.group_by.1.sort.% = 0",
+	"widget.0.timeseries_definition.0.request.4.network_query.0.compute.% = 2",
+	"widget.0.timeseries_definition.0.request.4.network_query.0.compute.facet = network.bytes_read",
+	"widget.0.timeseries_definition.0.request.5.rum_query.0.search.% = 1",
+	"widget.0.timeseries_definition.0.request.5.rum_query.0.group_by.0.limit = 10",
+	"widget.0.timeseries_definition.0.request.4.network_query.0.search.% = 1",
+	"widget.0.timeseries_definition.0.request.4.network_query.0.group_by.1.limit = 0",
+	"widget.0.timeseries_definition.0.request.5.rum_query.0.compute.facet = @duration",
+	"widget.0.timeseries_definition.0.request.4.network_query.0.group_by.1.facet = dest_environment",
+	"widget.0.timeseries_definition.0.request.4.network_query.0.search.query = network.transport:udp network.destination.ip:\"*\"",
+	"widget.0.timeseries_definition.0.request.4.network_query.0.group_by.0.limit = 0",
+	"widget.0.timeseries_definition.0.request.5.display_type = area",
+	"widget.0.timeseries_definition.0.request.4.network_query.0.index = netflow-search",
+	"widget.0.timeseries_definition.0.request.5.rum_query.0.group_by.0.sort.facet = @duration",
+	"widget.0.timeseries_definition.0.request.4.q =",
+	"widget.0.timeseries_definition.0.request.5.rum_query.0.compute.% = 3",
+	"widget.0.timeseries_definition.0.request.5.rum_query.0.group_by.0.sort.aggregation = avg",
+	"widget.0.timeseries_definition.0.request.5.style.0.line_type = solid",
+	"widget.0.timeseries_definition.0.request.5.rum_query.0.group_by.0.facet = service",
+	"widget.0.timeseries_definition.0.request.4.style.0.line_type = solid",
+	"widget.0.timeseries_definition.0.request.5.rum_query.0.compute.interval = 10",
+	"widget.0.timeseries_definition.0.request.5.rum_query.0.compute.aggregation = avg",
+	"widget.0.timeseries_definition.0.request.5.style.0.line_width = normal",
+	"widget.0.timeseries_definition.0.request.4.style.0.line_width = normal",
+	"widget.0.timeseries_definition.0.request.4.style.0.palette = orange",
+	"widget.0.timeseries_definition.0.request.4.display_type = area",
+	"widget.0.timeseries_definition.0.request.4.network_query.0.group_by.0.sort.% = 0",
+	"widget.0.timeseries_definition.0.request.5.style.0.palette = grey",
+	"widget.0.timeseries_definition.0.request.4.network_query.0.compute.aggregation = sum",
+	"widget.0.timeseries_definition.0.request.5.q =",
+	"widget.0.timeseries_definition.0.request.5.rum_query.0.index = *",
+	"widget.0.timeseries_definition.0.request.5.rum_query.0.group_by.0.sort.order = desc",
+	"widget.0.timeseries_definition.0.request.5.rum_query.0.search.query =",
 }
 
 func TestAccDatadogDashboardTimeseries(t *testing.T) {
-	accProviders, cleanup := testAccProviders(t)
-	defer cleanup(t)
-	accProvider := testAccProvider(t, accProviders)
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    accProviders,
-		CheckDestroy: checkDashboardDestroy(accProvider),
-		Steps: []resource.TestStep{
-			{
-				Config: datadogDashboardTimeseriesConfig,
-				Check: resource.ComposeTestCheckFunc(
-					testCheckResourceAttrs("datadog_dashboard.timeseries_dashboard", checkDashboardExists(accProvider), datadogDashboardTimeseriesAsserts)...,
-				),
-			},
-		},
-	})
+	testAccDatadogDashboardWidgetUtil(t, datadogDashboardTimeseriesConfig, "datadog_dashboard.timeseries_dashboard", datadogDashboardTimeseriesAsserts)
 }
 
 func TestAccDatadogDashboardTimeseries_import(t *testing.T) {
-	accProviders, cleanup := testAccProviders(t)
-	defer cleanup(t)
-	accProvider := testAccProvider(t, accProviders)
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    accProviders,
-		CheckDestroy: checkDashboardDestroy(accProvider),
-		Steps: []resource.TestStep{
-			{
-				Config: datadogDashboardTimeseriesConfig,
-			},
-			{
-				ResourceName:      "datadog_dashboard.timeseries_dashboard",
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-		},
-	})
+	testAccDatadogDashboardWidgetUtil_import(t, datadogDashboardTimeseriesConfig, "datadog_dashboard.timeseries_dashboard")
 }

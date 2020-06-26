@@ -2,8 +2,6 @@ package datadog
 
 import (
 	"testing"
-
-	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
 )
 
 // JSON export used as test scenario
@@ -64,8 +62,8 @@ resource "datadog_dashboard" "distribution_dashboard" {
 			title = "Avg of system.cpu.user over account:prod by service,account"
 			title_align = "left"
 			title_size = "16"
-			//show_legend = "true"
-			//legend_size = "2"
+			show_legend = "true"
+			legend_size = "2"
 			time = {
 				live_span = "1h"
 			}
@@ -86,6 +84,8 @@ var datadogDashboardDistributionAsserts = []string{
 	"widget.0.distribution_definition.0.title = Avg of system.cpu.user over account:prod by service,account",
 	"widget.0.distribution_definition.0.title_size = 16",
 	"widget.0.distribution_definition.0.title_align = left",
+	"widget.0.distribution_definition.0.show_legend = true",
+	"widget.0.distribution_definition.0.legend_size = 2",
 	"description = Created using the Datadog provider in Terraform",
 	"widget.0.distribution_definition.0.request.0.q = avg:system.cpu.user{account:prod} by {service,account}",
 	"widget.0.distribution_definition.0.request.0.style.0.palette = purple",
@@ -94,43 +94,9 @@ var datadogDashboardDistributionAsserts = []string{
 }
 
 func TestAccDatadogDashboardDistribution(t *testing.T) {
-	accProviders, cleanup := testAccProviders(t)
-	defer cleanup(t)
-	accProvider := testAccProvider(t, accProviders)
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    accProviders,
-		CheckDestroy: checkDashboardDestroy(accProvider),
-		Steps: []resource.TestStep{
-			{
-				Config: datadogDashboardDistributionConfig,
-				Check: resource.ComposeTestCheckFunc(
-					testCheckResourceAttrs("datadog_dashboard.distribution_dashboard", checkDashboardExists(accProvider), datadogDashboardDistributionAsserts)...,
-				),
-			},
-		},
-	})
+	testAccDatadogDashboardWidgetUtil(t, datadogDashboardDistributionConfig, "datadog_dashboard.distribution_dashboard", datadogDashboardDistributionAsserts)
 }
 
 func TestAccDatadogDashboardDistribution_import(t *testing.T) {
-	accProviders, cleanup := testAccProviders(t)
-	defer cleanup(t)
-	accProvider := testAccProvider(t, accProviders)
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    accProviders,
-		CheckDestroy: checkDashboardDestroy(accProvider),
-		Steps: []resource.TestStep{
-			{
-				Config: datadogDashboardDistributionConfig,
-			},
-			{
-				ResourceName:      "datadog_dashboard.distribution_dashboard",
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-		},
-	})
+	testAccDatadogDashboardWidgetUtil_import(t, datadogDashboardDistributionConfig, "datadog_dashboard.distribution_dashboard")
 }

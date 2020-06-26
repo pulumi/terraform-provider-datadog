@@ -50,6 +50,12 @@ func resourceDatadogDashboard() *schema.Resource {
 				Default:     false,
 				Description: "Whether this dashboard is read-only.",
 			},
+			"url": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				Description: "The URL of the dashboard.",
+			},
 			"template_variable": {
 				Type:        schema.TypeList,
 				Optional:    true,
@@ -127,6 +133,9 @@ func resourceDatadogDashboardRead(d *schema.ResourceData, meta interface{}) erro
 		return err
 	}
 	if err = d.Set("is_read_only", dashboard.GetIsReadOnly()); err != nil {
+		return err
+	}
+	if err = d.Set("url", dashboard.GetUrl()); err != nil {
 		return err
 	}
 
@@ -620,6 +629,15 @@ func getNonGroupWidgetSchema() map[string]*schema.Schema {
 				Schema: getScatterplotDefinitionSchema(),
 			},
 		},
+		"servicemap_definition": {
+			Type:        schema.TypeList,
+			Optional:    true,
+			MaxItems:    1,
+			Description: "The definition for a Service Map widget",
+			Elem: &schema.Resource{
+				Schema: getServiceMapDefinitionSchema(),
+			},
+		},
 		"service_level_objective_definition": {
 			Type:        schema.TypeList,
 			Optional:    true,
@@ -755,6 +773,10 @@ func buildDatadogWidget(terraformWidget map[string]interface{}) (*datadogV1.Widg
 		if scatterplotDefinition, ok := def[0].(map[string]interface{}); ok {
 			definition = datadogV1.ScatterPlotWidgetDefinitionAsWidgetDefinition(buildDatadogScatterplotDefinition(scatterplotDefinition))
 		}
+	} else if def, ok := terraformWidget["servicemap_definition"].([]interface{}); ok && len(def) > 0 {
+		if serviceMapDefinition, ok := def[0].(map[string]interface{}); ok {
+			definition = datadogV1.ServiceMapWidgetDefinitionAsWidgetDefinition(buildDatadogServiceMapDefinition(serviceMapDefinition))
+		}
 	} else if def, ok := terraformWidget["service_level_objective_definition"].([]interface{}); ok && len(def) > 0 {
 		if serviceLevelObjectiveDefinition, ok := def[0].(map[string]interface{}); ok {
 			definition = datadogV1.SLOWidgetDefinitionAsWidgetDefinition(buildDatadogServiceLevelObjectiveDefinition(serviceLevelObjectiveDefinition))
@@ -867,6 +889,9 @@ func buildTerraformWidget(datadogWidget datadogV1.Widget) (map[string]interface{
 	} else if widgetDefinition.ScatterPlotWidgetDefinition != nil {
 		terraformDefinition := buildTerraformScatterplotDefinition(*widgetDefinition.ScatterPlotWidgetDefinition)
 		terraformWidget["scatterplot_definition"] = []map[string]interface{}{terraformDefinition}
+	} else if widgetDefinition.ServiceMapWidgetDefinition != nil {
+		terraformDefinition := buildTerraformServiceMapDefinition(*widgetDefinition.ServiceMapWidgetDefinition)
+		terraformWidget["servicemap_definition"] = []map[string]interface{}{terraformDefinition}
 	} else if widgetDefinition.SLOWidgetDefinition != nil {
 		terraformDefinition := buildTerraformServiceLevelObjectiveDefinition(*widgetDefinition.SLOWidgetDefinition)
 		terraformWidget["service_level_objective_definition"] = []map[string]interface{}{terraformDefinition}
@@ -1267,8 +1292,8 @@ func getChangeRequestSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
 		// A request should implement exactly one of the following type of query
 		"q":             getMetricQuerySchema(),
-		"apm_query":     getApmOrLogQuerySchema(),
-		"log_query":     getApmOrLogQuerySchema(),
+		"apm_query":     getApmLogNetworkOrRumQuerySchema(),
+		"log_query":     getApmLogNetworkOrRumQuerySchema(),
 		"process_query": getProcessQuerySchema(),
 		// Settings specific to Change requests
 		"change_type": {
@@ -1404,6 +1429,15 @@ func getDistributionDefinitionSchema() map[string]*schema.Schema {
 			Type:     schema.TypeString,
 			Optional: true,
 		},
+		"legend_size": {
+			Type:         schema.TypeString,
+			Optional:     true,
+			ValidateFunc: validateTimeseriesWidgetLegendSize,
+		},
+		"show_legend": {
+			Type:     schema.TypeBool,
+			Optional: true,
+		},
 		"time": {
 			Type:     schema.TypeMap,
 			Optional: true,
@@ -1419,6 +1453,12 @@ func buildDatadogDistributionDefinition(terraformDefinition map[string]interface
 	terraformRequests := terraformDefinition["request"].([]interface{})
 	datadogDefinition.Requests = *buildDatadogDistributionRequests(&terraformRequests)
 	// Optional params
+	if v, ok := terraformDefinition["show_legend"].(bool); ok {
+		datadogDefinition.SetShowLegend(v)
+	}
+	if v, ok := terraformDefinition["legend_size"].(string); ok && len(v) != 0 {
+		datadogDefinition.SetLegendSize(datadogV1.WidgetLegendSize(v))
+	}
 	if v, ok := terraformDefinition["title"].(string); ok && len(v) != 0 {
 		datadogDefinition.SetTitle(v)
 	}
@@ -1438,6 +1478,12 @@ func buildTerraformDistributionDefinition(datadogDefinition datadogV1.Distributi
 	// Required params
 	terraformDefinition["request"] = buildTerraformDistributionRequests(&datadogDefinition.Requests)
 	// Optional params
+	if v, ok := datadogDefinition.GetShowLegendOk(); ok {
+		terraformDefinition["show_legend"] = *v
+	}
+	if v, ok := datadogDefinition.GetLegendSizeOk(); ok {
+		terraformDefinition["legend_size"] = *v
+	}
 	if v, ok := datadogDefinition.GetTitleOk(); ok {
 		terraformDefinition["title"] = *v
 	}
@@ -1457,8 +1503,8 @@ func getDistributionRequestSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
 		// A request should implement exactly one of the following type of query
 		"q":             getMetricQuerySchema(),
-		"apm_query":     getApmOrLogQuerySchema(),
-		"log_query":     getApmOrLogQuerySchema(),
+		"apm_query":     getApmLogNetworkOrRumQuerySchema(),
+		"log_query":     getApmLogNetworkOrRumQuerySchema(),
 		"process_query": getProcessQuerySchema(),
 		// Settings specific to Distribution requests
 		"style": {
@@ -1916,6 +1962,22 @@ func getHeatmapDefinitionSchema() map[string]*schema.Schema {
 			Type:     schema.TypeString,
 			Optional: true,
 		},
+		"event": {
+			Type:     schema.TypeList,
+			Optional: true,
+			Elem: &schema.Resource{
+				Schema: getWidgetEventSchema(),
+			},
+		},
+		"show_legend": {
+			Type:     schema.TypeBool,
+			Optional: true,
+		},
+		"legend_size": {
+			Type:         schema.TypeString,
+			Optional:     true,
+			ValidateFunc: validateTimeseriesWidgetLegendSize,
+		},
 		"time": {
 			Type:     schema.TypeMap,
 			Optional: true,
@@ -1935,6 +1997,15 @@ func buildDatadogHeatmapDefinition(terraformDefinition map[string]interface{}) *
 		if v, ok := axis[0].(map[string]interface{}); ok && len(v) > 0 {
 			datadogDefinition.Yaxis = buildDatadogWidgetAxis(v)
 		}
+	}
+	if v, ok := terraformDefinition["event"].([]interface{}); ok && len(v) > 0 {
+		datadogDefinition.Events = buildDatadogWidgetEvents(&v)
+	}
+	if v, ok := terraformDefinition["show_legend"].(bool); ok {
+		datadogDefinition.SetShowLegend(v)
+	}
+	if v, ok := terraformDefinition["legend_size"].(string); ok && len(v) != 0 {
+		datadogDefinition.SetLegendSize(datadogV1.WidgetLegendSize(v))
 	}
 	if v, ok := terraformDefinition["title"].(string); ok && len(v) != 0 {
 		datadogDefinition.SetTitle(v)
@@ -1959,6 +2030,9 @@ func buildTerraformHeatmapDefinition(datadogDefinition datadogV1.HeatMapWidgetDe
 		axis := buildTerraformWidgetAxis(*v)
 		terraformDefinition["yaxis"] = []map[string]interface{}{axis}
 	}
+	if v, ok := datadogDefinition.GetEventsOk(); ok {
+		terraformDefinition["event"] = buildTerraformWidgetEvents(v)
+	}
 	if v, ok := datadogDefinition.GetTitleOk(); ok {
 		terraformDefinition["title"] = *v
 	}
@@ -1967,6 +2041,12 @@ func buildTerraformHeatmapDefinition(datadogDefinition datadogV1.HeatMapWidgetDe
 	}
 	if v, ok := datadogDefinition.GetTitleAlignOk(); ok {
 		terraformDefinition["title_align"] = *v
+	}
+	if v, ok := datadogDefinition.GetShowLegendOk(); ok {
+		terraformDefinition["show_legend"] = *v
+	}
+	if v, ok := datadogDefinition.GetLegendSizeOk(); ok {
+		terraformDefinition["legend_size"] = *v
 	}
 	if v, ok := datadogDefinition.GetTimeOk(); ok {
 		terraformDefinition["time"] = buildTerraformWidgetTime(*v)
@@ -1978,8 +2058,8 @@ func getHeatmapRequestSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
 		// A request should implement exactly one of the following type of query
 		"q":             getMetricQuerySchema(),
-		"apm_query":     getApmOrLogQuerySchema(),
-		"log_query":     getApmOrLogQuerySchema(),
+		"apm_query":     getApmLogNetworkOrRumQuerySchema(),
+		"log_query":     getApmLogNetworkOrRumQuerySchema(),
 		"process_query": getProcessQuerySchema(),
 		// Settings specific to Heatmap requests
 		"style": {
@@ -2250,8 +2330,8 @@ func getHostmapRequestSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
 		// A request should implement at least one of the following type of query
 		"q":             getMetricQuerySchema(),
-		"apm_query":     getApmOrLogQuerySchema(),
-		"log_query":     getApmOrLogQuerySchema(),
+		"apm_query":     getApmLogNetworkOrRumQuerySchema(),
+		"log_query":     getApmLogNetworkOrRumQuerySchema(),
 		"process_query": getProcessQuerySchema(),
 	}
 }
@@ -2954,8 +3034,8 @@ func getQueryValueRequestSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
 		// A request should implement exactly one of the following type of query
 		"q":             getMetricQuerySchema(),
-		"apm_query":     getApmOrLogQuerySchema(),
-		"log_query":     getApmOrLogQuerySchema(),
+		"apm_query":     getApmLogNetworkOrRumQuerySchema(),
+		"log_query":     getApmLogNetworkOrRumQuerySchema(),
 		"process_query": getProcessQuerySchema(),
 		// Settings specific to QueryValue requests
 		"conditional_formats": {
@@ -3108,8 +3188,8 @@ func getQueryTableRequestSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
 		// A request should implement exactly one of the following type of query
 		"q":             getMetricQuerySchema(),
-		"apm_query":     getApmOrLogQuerySchema(),
-		"log_query":     getApmOrLogQuerySchema(),
+		"apm_query":     getApmLogNetworkOrRumQuerySchema(),
+		"log_query":     getApmLogNetworkOrRumQuerySchema(),
 		"process_query": getProcessQuerySchema(),
 		// Settings specific to QueryTable requests
 		"conditional_formats": {
@@ -3386,8 +3466,8 @@ func getScatterplotRequestSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
 		// A request should implement exactly one of the following type of query
 		"q":             getMetricQuerySchema(),
-		"apm_query":     getApmOrLogQuerySchema(),
-		"log_query":     getApmOrLogQuerySchema(),
+		"apm_query":     getApmLogNetworkOrRumQuerySchema(),
+		"log_query":     getApmLogNetworkOrRumQuerySchema(),
 		"process_query": getProcessQuerySchema(),
 		// Settings specific to Scatterplot requests
 		"aggregator": {
@@ -3437,6 +3517,81 @@ func buildTerraformScatterplotRequest(datadogScatterplotRequest *datadogV1.Scatt
 		terraformRequest["aggregator"] = *datadogScatterplotRequest.Aggregator
 	}
 	return &terraformRequest
+}
+
+//
+// ServiceMap Widget Definition helpers
+//
+
+func getServiceMapDefinitionSchema() map[string]*schema.Schema {
+	return map[string]*schema.Schema{
+		"service": {
+			Type:     schema.TypeString,
+			Required: true,
+		},
+		"filters": {
+			Type:     schema.TypeList,
+			Required: true,
+			Elem:     &schema.Schema{Type: schema.TypeString},
+		},
+		"title": {
+			Type:     schema.TypeString,
+			Optional: true,
+		},
+		"title_size": {
+			Type:     schema.TypeString,
+			Optional: true,
+		},
+		"title_align": {
+			Type:     schema.TypeString,
+			Optional: true,
+		},
+	}
+}
+func buildDatadogServiceMapDefinition(terraformDefinition map[string]interface{}) *datadogV1.ServiceMapWidgetDefinition {
+	datadogDefinition := datadogV1.NewServiceMapWidgetDefinitionWithDefaults()
+
+	// Required params
+	datadogDefinition.SetService(terraformDefinition["service"].(string))
+	terraformFilters := terraformDefinition["filters"].([]interface{})
+	datadogFilters := make([]string, len(terraformFilters))
+	for i, terraformFilter := range terraformFilters {
+		datadogFilters[i] = terraformFilter.(string)
+	}
+	datadogDefinition.SetFilters(datadogFilters)
+
+	// Optional params
+	if v, ok := terraformDefinition["title"].(string); ok && len(v) != 0 {
+		datadogDefinition.SetTitle(v)
+	}
+	if v, ok := terraformDefinition["title_size"].(string); ok && len(v) != 0 {
+		datadogDefinition.SetTitleSize(v)
+	}
+	if v, ok := terraformDefinition["title_align"].(string); ok && len(v) != 0 {
+		datadogDefinition.SetTitleAlign(datadogV1.WidgetTextAlign(v))
+	}
+
+	return datadogDefinition
+}
+func buildTerraformServiceMapDefinition(datadogDefinition datadogV1.ServiceMapWidgetDefinition) map[string]interface{} {
+	terraformDefinition := map[string]interface{}{}
+
+	// Required params
+	terraformDefinition["service"] = datadogDefinition.GetService()
+	terraformDefinition["filters"] = datadogDefinition.GetFilters()
+
+	// Optional params
+	if v, ok := datadogDefinition.GetTitleOk(); ok {
+		terraformDefinition["title"] = *v
+	}
+	if v, ok := datadogDefinition.GetTitleSizeOk(); ok {
+		terraformDefinition["title_size"] = *v
+	}
+	if v, ok := datadogDefinition.GetTitleAlignOk(); ok {
+		terraformDefinition["title_align"] = *v
+	}
+
+	return terraformDefinition
 }
 
 //
@@ -3687,9 +3842,7 @@ func buildTerraformTimeseriesDefinition(datadogDefinition datadogV1.TimeseriesWi
 	if v, ok := datadogDefinition.GetLegendSizeOk(); ok {
 		terraformDefinition["legend_size"] = *v
 	}
-	if datadogDefinition.LegendSize != nil {
-		terraformDefinition["legend_size"] = *datadogDefinition.LegendSize
-	}
+
 	return terraformDefinition
 }
 
@@ -3697,8 +3850,10 @@ func getTimeseriesRequestSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
 		// A request should implement exactly one of the following type of query
 		"q":             getMetricQuerySchema(),
-		"apm_query":     getApmOrLogQuerySchema(),
-		"log_query":     getApmOrLogQuerySchema(),
+		"apm_query":     getApmLogNetworkOrRumQuerySchema(),
+		"log_query":     getApmLogNetworkOrRumQuerySchema(),
+		"rum_query":     getApmLogNetworkOrRumQuerySchema(),
+		"network_query": getApmLogNetworkOrRumQuerySchema(),
 		"process_query": getProcessQuerySchema(),
 		// Settings specific to Timeseries requests
 		"style": {
@@ -3758,6 +3913,12 @@ func buildDatadogTimeseriesRequests(terraformRequests *[]interface{}) *[]datadog
 		} else if v, ok := terraformRequest["log_query"].([]interface{}); ok && len(v) > 0 {
 			logQuery := v[0].(map[string]interface{})
 			datadogTimeseriesRequest.LogQuery = buildDatadogApmOrLogQuery(logQuery)
+		} else if v, ok := terraformRequest["network_query"].([]interface{}); ok && len(v) > 0 {
+			networkQuery := v[0].(map[string]interface{})
+			datadogTimeseriesRequest.NetworkQuery = buildDatadogApmOrLogQuery(networkQuery)
+		} else if v, ok := terraformRequest["rum_query"].([]interface{}); ok && len(v) > 0 {
+			rumQuery := v[0].(map[string]interface{})
+			datadogTimeseriesRequest.RumQuery = buildDatadogApmOrLogQuery(rumQuery)
 		} else if v, ok := terraformRequest["process_query"].([]interface{}); ok && len(v) > 0 {
 			processQuery := v[0].(map[string]interface{})
 			datadogTimeseriesRequest.ProcessQuery = buildDatadogProcessQuery(processQuery)
@@ -3801,6 +3962,12 @@ func buildTerraformTimeseriesRequests(datadogTimeseriesRequests *[]datadogV1.Tim
 		} else if v, ok := datadogRequest.GetLogQueryOk(); ok {
 			terraformQuery := buildTerraformApmOrLogQuery(*v)
 			terraformRequest["log_query"] = []map[string]interface{}{terraformQuery}
+		} else if v, ok := datadogRequest.GetNetworkQueryOk(); ok {
+			terraformQuery := buildTerraformApmOrLogQuery(*v)
+			terraformRequest["network_query"] = []map[string]interface{}{terraformQuery}
+		} else if v, ok := datadogRequest.GetRumQueryOk(); ok {
+			terraformQuery := buildTerraformApmOrLogQuery(*v)
+			terraformRequest["rum_query"] = []map[string]interface{}{terraformQuery}
 		} else if v, ok := datadogRequest.GetProcessQueryOk(); ok {
 			terraformQuery := buildTerraformProcessQuery(*v)
 			terraformRequest["process_query"] = []map[string]interface{}{terraformQuery}
@@ -3912,8 +4079,8 @@ func getToplistRequestSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
 		// A request should implement exactly one of the following type of query
 		"q":             getMetricQuerySchema(),
-		"apm_query":     getApmOrLogQuerySchema(),
-		"log_query":     getApmOrLogQuerySchema(),
+		"apm_query":     getApmLogNetworkOrRumQuerySchema(),
+		"log_query":     getApmLogNetworkOrRumQuerySchema(),
 		"process_query": getProcessQuerySchema(),
 		// Settings specific to Toplist requests
 		"conditional_formats": {
@@ -4383,8 +4550,8 @@ func getMetricQuerySchema() *schema.Schema {
 	}
 }
 
-// APM or Log Query
-func getApmOrLogQuerySchema() *schema.Schema {
+// APM, Log, Network or RUM Query
+func getApmLogNetworkOrRumQuerySchema() *schema.Schema {
 	return &schema.Schema{
 		Type:     schema.TypeList,
 		Optional: true,
@@ -4836,7 +5003,7 @@ func validateGroupWidgetLayoutType(val interface{}, key string) (warns []string,
 func validateTimeseriesWidgetLegendSize(val interface{}, key string) (warns []string, errs []error) {
 	value := val.(string)
 	switch value {
-	case "2", "4", "8", "16", "auto":
+	case "0", "2", "4", "8", "16", "auto":
 		break
 	default:
 		errs = append(errs, fmt.Errorf(
