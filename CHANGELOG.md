@@ -1,3 +1,21 @@
+## 2.12.0 (July 22, 2020)
+
+FEATURES:
+* `datadog_monitor`: Add new datasource for monitors ([#569](https://github.com/terraform-providers/terraform-provider-datadog/issues/569)], [[#585](https://github.com/terraform-providers/terraform-provider-datadog/issues/585))
+
+IMPROVEMENTS:
+* `datadog_synthetics_test`: Enable usage of `validatesJSONPath` operator ([#571](https://github.com/terraform-providers/terraform-provider-datadog/issues/571))
+* `datadog_synthetics_test`: Allow usage of the new assertion format ([#571](https://github.com/terraform-providers/terraform-provider-datadog/issues/571)], [[#582](https://github.com/terraform-providers/terraform-provider-datadog/issues/582))
+* `datadog_synthetics_test`: Add support for `basicAuth` and `query` ([#586](https://github.com/terraform-providers/terraform-provider-datadog/issues/586))
+
+BUGFIXES:
+* `datadog_downtime`: Replace `time.LoadLocation` by tz.LoadLocation from `4d63.com/tz` package ([#560](https://github.com/terraform-providers/terraform-provider-datadog/issues/560))
+* `datadog_downtime`: Use `TypeSet` for monitor tags to avoid unnecessary diffs ([#540](https://github.com/terraform-providers/terraform-provider-datadog/issues/540))
+* `provider`: Respect the debug setting in the new Go Datadog client ([#580](https://github.com/terraform-providers/terraform-provider-datadog/issues/580))
+
+NOTES:
+* `datadog_integration_pagerduty`: This resource is deprecated. You can use `datadog_integration_pagerduty_service_object` resources directly once the integration is activated ([#584](https://github.com/terraform-providers/terraform-provider-datadog/issues/584))
+
 ## 2.11.0 (June 29, 2020)
 
 FEATURES:

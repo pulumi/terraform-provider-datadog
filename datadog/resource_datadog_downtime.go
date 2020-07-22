@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"4d63.com/tz"
 	datadogV1 "github.com/DataDog/datadog-api-client-go/api/v1/datadog"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
@@ -135,13 +136,14 @@ func resourceDatadogDowntime() *schema.Resource {
 				Description:   "When specified, this downtime will only apply to this monitor",
 			},
 			"monitor_tags": {
-				Type:        schema.TypeList,
+				// TypeSet makes Terraform ignore differences in order when creating a plan
+				Type:        schema.TypeSet,
 				Optional:    true,
 				Description: "A list of monitor tags (up to 25), i.e. tags that are applied directly to monitors to which the downtime applies",
 				// MonitorTags conflicts with MonitorId and it also has a default of `["*"]`, which brings some problems:
 				// * We can't use DefaultFunc to default to ["*"], since that's incompatible with
 				//   ConflictsWith
-				// * Since this is a TypeList, DiffSuppressFunc can't really be written well for it
+				// * Since this is a TypeSet, DiffSuppressFunc can't really be written well for it
 				//   (it is called and expected to give result for each element, not for the whole
 				//    list, so there's no way to tell in each iteration whether the new config value
 				//    is an empty list).
@@ -272,7 +274,7 @@ func buildDowntimeStruct(authV1 context.Context, d *schema.ResourceData, client 
 	}
 	dt.SetScope(scope)
 	var tags []string
-	for _, mt := range d.Get("monitor_tags").([]interface{}) {
+	for _, mt := range d.Get("monitor_tags").(*schema.Set).List() {
 		tags = append(tags, mt.(string))
 	}
 	dt.SetMonitorTags(tags)
@@ -494,7 +496,7 @@ func validateDatadogDowntimeTimezone(v interface{}, k string) (ws []string, erro
 		zone, _ := time.Now().Local().Zone()
 		return validateDatadogDowntimeRecurrenceType(zone, k)
 	default:
-		_, err := time.LoadLocation(value)
+		_, err := tz.LoadLocation(value)
 		if err != nil {
 			errors = append(errors, fmt.Errorf(
 				"%q contains an invalid timezone parameter: %q, Valid parameters are IANA Time Zone names",
