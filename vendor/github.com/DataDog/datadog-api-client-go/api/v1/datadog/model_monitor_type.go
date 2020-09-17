@@ -28,6 +28,7 @@ const (
 	MONITORTYPE_SERVICE_CHECK         MonitorType = "service check"
 	MONITORTYPE_SYNTHETICS_ALERT      MonitorType = "synthetics alert"
 	MONITORTYPE_TRACE_ANALYTICS_ALERT MonitorType = "trace-analytics alert"
+	MONITORTYPE_SLO_ALERT             MonitorType = "slo alert"
 )
 
 func (v *MonitorType) UnmarshalJSON(src []byte) error {
@@ -37,14 +38,14 @@ func (v *MonitorType) UnmarshalJSON(src []byte) error {
 		return err
 	}
 	enumTypeValue := MonitorType(value)
-	for _, existing := range []MonitorType{"composite", "event alert", "log alert", "metric alert", "process alert", "query alert", "rum alert", "service check", "synthetics alert", "trace-analytics alert"} {
+	for _, existing := range []MonitorType{"composite", "event alert", "log alert", "metric alert", "process alert", "query alert", "rum alert", "service check", "synthetics alert", "trace-analytics alert", "slo alert"} {
 		if existing == enumTypeValue {
 			*v = enumTypeValue
 			return nil
 		}
 	}
 
-	return fmt.Errorf("%+v is not a valid MonitorType", *v)
+	return fmt.Errorf("%+v is not a valid MonitorType", value)
 }
 
 // Ptr returns reference to MonitorType value

@@ -13,9 +13,10 @@ import (
 )
 
 // config
-const testAccCheckDatadogServiceLevelObjectiveConfig = `
+func testAccCheckDatadogServiceLevelObjectiveConfig(uniq string) string {
+	return fmt.Sprintf(`
 resource "datadog_service_level_objective" "foo" {
-  name = "name for metric SLO foo"
+  name = "%s"
   type = "metric"
   description = "some description about foo SLO"
   query {
@@ -40,12 +41,13 @@ resource "datadog_service_level_objective" "foo" {
   }
 
   tags = ["foo:bar", "baz"]
+}`, uniq)
 }
-`
 
-const testAccCheckDatadogServiceLevelObjectiveConfigUpdated = `
+func testAccCheckDatadogServiceLevelObjectiveConfigUpdated(uniq string) string {
+	return fmt.Sprintf(`
 resource "datadog_service_level_objective" "foo" {
-  name = "updated name for metric SLO foo"
+  name = "%s"
   type = "metric"
   description = "some updated description about foo SLO"
   query {
@@ -71,27 +73,29 @@ resource "datadog_service_level_objective" "foo" {
   }
 
   tags = ["foo:bar", "baz"]
+}`, uniq)
 }
-`
 
 // tests
 
 func TestAccDatadogServiceLevelObjective_Basic(t *testing.T) {
-	accProviders, cleanup := testAccProviders(t, initRecorder(t))
+	accProviders, clock, cleanup := testAccProviders(t, initRecorder(t))
+	sloName := uniqueEntityName(clock, t)
+	sloNameUpdated := sloName + "-updated"
 	defer cleanup(t)
 	accProvider := testAccProvider(t, accProviders)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    accProviders,
 		CheckDestroy: testAccCheckDatadogServiceLevelObjectiveDestroy(accProvider),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccCheckDatadogServiceLevelObjectiveConfig,
+				Config: testAccCheckDatadogServiceLevelObjectiveConfig(sloName),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckDatadogServiceLevelObjectiveExists(accProvider, "datadog_service_level_objective.foo"),
 					resource.TestCheckResourceAttr(
-						"datadog_service_level_objective.foo", "name", "name for metric SLO foo"),
+						"datadog_service_level_objective.foo", "name", sloName),
 					resource.TestCheckResourceAttr(
 						"datadog_service_level_objective.foo", "description", "some description about foo SLO"),
 					resource.TestCheckResourceAttr(
@@ -130,11 +134,11 @@ func TestAccDatadogServiceLevelObjective_Basic(t *testing.T) {
 				),
 			},
 			{
-				Config: testAccCheckDatadogServiceLevelObjectiveConfigUpdated,
+				Config: testAccCheckDatadogServiceLevelObjectiveConfigUpdated(sloNameUpdated),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckDatadogServiceLevelObjectiveExists(accProvider, "datadog_service_level_objective.foo"),
 					resource.TestCheckResourceAttr(
-						"datadog_service_level_objective.foo", "name", "updated name for metric SLO foo"),
+						"datadog_service_level_objective.foo", "name", sloNameUpdated),
 					resource.TestCheckResourceAttr(
 						"datadog_service_level_objective.foo", "description", "some updated description about foo SLO"),
 					resource.TestCheckResourceAttr(

@@ -10,12 +10,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/terraform"
 )
 
-const datadogOrderedDashboardConfig = `
+func datadogOrderedDashboardConfig(uniq string) string {
+	return fmt.Sprintf(`
 resource "datadog_dashboard" "ordered_dashboard" {
-  title         = "Acceptance Test Ordered Dashboard"
-  description   = "Created using the Datadog provider in Terraform"
-  layout_type   = "ordered"
-  is_read_only  = true
+	title         = "%s"
+	description   = "Created using the Datadog provider in Terraform"
+	layout_type   = "ordered"
+	is_read_only  = true
 	widget {
 		alert_graph_definition {
 			alert_id = "895605"
@@ -130,33 +131,35 @@ resource "datadog_dashboard" "ordered_dashboard" {
 			text_align = "center"
 			show_tick = true
 			tick_edge = "left"
-			tick_pos = "50%"
+			tick_pos = "50%%" # string escaped as this is used as a format string
 		}
 	}
 	widget {
 		query_value_definition {
-		  request {
-			q = "avg:system.load.1{env:staging} by {account}"
-			aggregator = "sum"
-			conditional_formats {
-				comparator = "<"
-				value = "2"
-				palette = "white_on_green"
+			request {
+				q = "avg:system.load.1{env:staging} by {account}"
+				aggregator = "sum"
+				conditional_formats {
+					comparator = "<"
+					value = "2"
+					palette = "white_on_green"
+					metric = "system.load.1"
+				}
+				conditional_formats {
+					comparator = ">"
+					value = "2.2"
+					palette = "white_on_red"
+					metric = "system.load.1"
+				}
 			}
-			conditional_formats {
-				comparator = ">"
-				value = "2.2"
-				palette = "white_on_red"
+			autoscale = true
+			custom_unit = "xx"
+			precision = "4"
+			text_align = "right"
+			title = "Widget Title"
+			time = {
+				live_span = "1h"
 			}
-		  }
-		  autoscale = true
-		  custom_unit = "xx"
-		  precision = "4"
-		  text_align = "right"
-		  title = "Widget Title"
-		  time = {
-			live_span = "1h"
-		  }
 		}
 	}
 	widget {
@@ -262,6 +265,36 @@ resource "datadog_dashboard" "ordered_dashboard" {
 				}
 				display_type = "area"
 			}
+			request {
+				security_query {
+					index = "signal"
+					compute = {
+						aggregation = "count"
+					}
+					search = {
+						query = "status:(high OR critical)"
+					}
+					group_by {
+						facet = "status"
+					}
+				}
+				display_type = "bars"
+			}
+			request {
+				rum_query {
+					index = "rum"
+					compute = {
+						aggregation = "count"
+					}
+					search = {
+						query = "status:info"
+					}
+					group_by {
+						facet = "service"
+					}
+				}
+				display_type = "bars"
+			}
 			marker {
 				display_type = "error dashed"
 				label = " z=6 "
@@ -288,7 +321,7 @@ resource "datadog_dashboard" "ordered_dashboard" {
 				scale = "log"
 				include_zero = false
 				max = 100
-			  }
+			}
 		}
 	}
 	widget {
@@ -305,7 +338,7 @@ resource "datadog_dashboard" "ordered_dashboard" {
 					value = "2.2"
 					palette = "white_on_red"
 				}
-		  	}
+			}
 			title = "Widget Title"
 		}
 	}
@@ -322,7 +355,7 @@ resource "datadog_dashboard" "ordered_dashboard" {
 					text_align = "left"
 					show_tick = false
 					tick_edge = "left"
-					tick_pos = "50%"
+					tick_pos = "50%%" # string escaped as this is used as a format string
 				}
 			}
 			widget {
@@ -349,25 +382,25 @@ resource "datadog_dashboard" "ordered_dashboard" {
 	}
 	widget {
 		query_table_definition {
-		  request {
-			q = "avg:system.load.1{env:staging} by {account}"
-			aggregator = "sum"
-			limit = "10"
-			conditional_formats {
-				comparator = "<"
-				value = "2"
-				palette = "white_on_green"
+			request {
+				q = "avg:system.load.1{env:staging} by {account}"
+				aggregator = "sum"
+				limit = "10"
+				conditional_formats {
+					comparator = "<"
+					value = "2"
+					palette = "white_on_green"
+				}
+				conditional_formats {
+					comparator = ">"
+					value = "2.2"
+					palette = "white_on_red"
+				}
 			}
-			conditional_formats {
-				comparator = ">"
-				value = "2.2"
-				palette = "white_on_red"
+			title = "Widget Title"
+			time = {
+				live_span = "1h"
 			}
-		  }
-		  title = "Widget Title"
-		  time = {
-		    live_span = "1h"
-		  }
 		}
 	}
 	template_variable {
@@ -400,16 +433,17 @@ resource "datadog_dashboard" "ordered_dashboard" {
 			value = "var_1_value"
 		}
 	}
+}`, uniq)
 }
-`
 
-const datadogFreeDashboardConfig = `
+func datadogFreeDashboardConfig(uniq string) string {
+	return fmt.Sprintf(`
 resource "datadog_dashboard" "free_dashboard" {
-	title         = "Acceptance Test Free Dashboard"
+	title         = "%s"
 	description   = "Created using the Datadog provider in Terraform"
 	layout_type   = "free"
 	is_read_only  = false
-  	widget {
+	widget {
 		event_stream_definition {
 			query = "*"
 			event_size = "l"
@@ -426,7 +460,7 @@ resource "datadog_dashboard" "free_dashboard" {
 			x = 5
 			y = 5
 		}
-  	}
+	}
 	widget {
 		event_timeline_definition {
 			query = "*"
@@ -491,7 +525,7 @@ resource "datadog_dashboard" "free_dashboard" {
 			show_message_column = true
 			message_display = "expanded-md"
 			sort {
-				column = "time" 
+				column = "time"
 				order = "desc"
 			}
 		}
@@ -581,12 +615,11 @@ resource "datadog_dashboard" "free_dashboard" {
 			value = "var_1_value"
 		}
 	}
+}`, uniq)
 }
-`
 
 var datadogOrderedDashboardAsserts = []string{
 	// Dashboard metadata
-	"title = Acceptance Test Ordered Dashboard",
 	"description = Created using the Datadog provider in Terraform",
 	"layout_type = ordered",
 	"is_read_only = true",
@@ -667,9 +700,11 @@ var datadogOrderedDashboardAsserts = []string{
 	"widget.8.query_value_definition.0.request.0.conditional_formats.0.comparator = <",
 	"widget.8.query_value_definition.0.request.0.conditional_formats.0.value = 2",
 	"widget.8.query_value_definition.0.request.0.conditional_formats.0.palette = white_on_green",
+	"widget.8.query_value_definition.0.request.0.conditional_formats.0.metric = system.load.1",
 	"widget.8.query_value_definition.0.request.0.conditional_formats.1.comparator = >",
 	"widget.8.query_value_definition.0.request.0.conditional_formats.1.value = 2.2",
 	"widget.8.query_value_definition.0.request.0.conditional_formats.1.palette = white_on_red",
+	"widget.8.query_value_definition.0.request.0.conditional_formats.1.metric = system.load.1",
 	"widget.8.query_value_definition.0.autoscale = true",
 	"widget.8.query_value_definition.0.custom_unit = xx",
 	"widget.8.query_value_definition.0.precision = 4",
@@ -733,6 +768,16 @@ var datadogOrderedDashboardAsserts = []string{
 	"widget.10.timeseries_definition.0.request.3.process_query.0.filter_by.0 = active",
 	"widget.10.timeseries_definition.0.request.3.process_query.0.limit = 50",
 	"widget.10.timeseries_definition.0.request.3.display_type = area",
+	"widget.10.timeseries_definition.0.request.4.security_query.0.index = signal",
+	"widget.10.timeseries_definition.0.request.4.security_query.0.compute.aggregation = count",
+	"widget.10.timeseries_definition.0.request.4.security_query.0.search.query = status:(high OR critical)",
+	"widget.10.timeseries_definition.0.request.4.security_query.0.group_by.0.facet = status",
+	"widget.10.timeseries_definition.0.request.4.display_type = bars",
+	"widget.10.timeseries_definition.0.request.5.rum_query.0.index = rum",
+	"widget.10.timeseries_definition.0.request.5.rum_query.0.compute.aggregation = count",
+	"widget.10.timeseries_definition.0.request.5.rum_query.0.search.query = status:info",
+	"widget.10.timeseries_definition.0.request.5.rum_query.0.group_by.0.facet = service",
+	"widget.10.timeseries_definition.0.request.5.display_type = bars",
 	"widget.10.timeseries_definition.0.marker.# = 2",
 	"widget.10.timeseries_definition.0.marker.0.display_type = error dashed",
 	"widget.10.timeseries_definition.0.marker.0.label =  z=6 ",
@@ -822,7 +867,6 @@ var datadogOrderedDashboardAsserts = []string{
 
 var datadogFreeDashboardAsserts = []string{
 	// Dashboard metadata
-	"title = Acceptance Test Free Dashboard",
 	"description = Created using the Datadog provider in Terraform",
 	"layout_type = free",
 	"is_read_only = false",
@@ -939,19 +983,22 @@ var datadogFreeDashboardAsserts = []string{
 }
 
 func TestAccDatadogDashboard_update(t *testing.T) {
-	accProviders, cleanup := testAccProviders(t, initRecorder(t))
+	accProviders, clock, cleanup := testAccProviders(t, initRecorder(t))
+	dbName := uniqueEntityName(clock, t)
+	asserts := datadogOrderedDashboardAsserts
+	asserts = append(asserts, fmt.Sprintf("title = %s", dbName))
 	defer cleanup(t)
 	accProvider := testAccProvider(t, accProviders)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    accProviders,
 		CheckDestroy: checkDashboardDestroy(accProvider),
 		Steps: []resource.TestStep{
 			{
-				Config: datadogOrderedDashboardConfig,
+				Config: datadogOrderedDashboardConfig(dbName),
 				Check: resource.ComposeTestCheckFunc(
-					testCheckResourceAttrs("datadog_dashboard.ordered_dashboard", checkDashboardExists(accProvider), datadogOrderedDashboardAsserts)...,
+					testCheckResourceAttrs("datadog_dashboard.ordered_dashboard", checkDashboardExists(accProvider), asserts)...,
 				),
 			},
 		},
@@ -959,19 +1006,22 @@ func TestAccDatadogDashboard_update(t *testing.T) {
 }
 
 func TestAccDatadogFreeDashboard(t *testing.T) {
-	accProviders, cleanup := testAccProviders(t, initRecorder(t))
+	accProviders, clock, cleanup := testAccProviders(t, initRecorder(t))
+	dbName := uniqueEntityName(clock, t)
+	asserts := datadogFreeDashboardAsserts
+	asserts = append(asserts, fmt.Sprintf("title = %s", dbName))
 	defer cleanup(t)
 	accProvider := testAccProvider(t, accProviders)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    accProviders,
 		CheckDestroy: checkDashboardDestroy(accProvider),
 		Steps: []resource.TestStep{
 			{
-				Config: datadogFreeDashboardConfig,
+				Config: datadogFreeDashboardConfig(dbName),
 				Check: resource.ComposeTestCheckFunc(
-					testCheckResourceAttrs("datadog_dashboard.free_dashboard", checkDashboardExists(accProvider), datadogFreeDashboardAsserts)...,
+					testCheckResourceAttrs("datadog_dashboard.free_dashboard", checkDashboardExists(accProvider), asserts)...,
 				),
 			},
 		},
@@ -979,17 +1029,18 @@ func TestAccDatadogFreeDashboard(t *testing.T) {
 }
 
 func TestAccDatadogDashboard_import(t *testing.T) {
-	accProviders, cleanup := testAccProviders(t, initRecorder(t))
+	accProviders, clock, cleanup := testAccProviders(t, initRecorder(t))
+	dbName := uniqueEntityName(clock, t)
 	defer cleanup(t)
 	accProvider := testAccProvider(t, accProviders)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    accProviders,
 		CheckDestroy: checkDashboardDestroy(accProvider),
 		Steps: []resource.TestStep{
 			{
-				Config: datadogOrderedDashboardConfig,
+				Config: datadogOrderedDashboardConfig(dbName),
 			},
 			{
 				ResourceName:      "datadog_dashboard.ordered_dashboard",
@@ -997,7 +1048,7 @@ func TestAccDatadogDashboard_import(t *testing.T) {
 				ImportStateVerify: true,
 			},
 			{
-				Config: datadogFreeDashboardConfig,
+				Config: datadogFreeDashboardConfig(dbName),
 			},
 			{
 				ResourceName:      "datadog_dashboard.free_dashboard",
@@ -1043,11 +1094,17 @@ func checkDashboardDestroy(accProvider *schema.Provider) resource.TestCheckFunc 
 }
 
 func testAccDatadogDashboardWidgetUtil(t *testing.T, config string, name string, assertions []string) {
-	accProviders, cleanup := testAccProviders(t, initRecorder(t))
+	accProviders, clock, cleanup := testAccProviders(t, initRecorder(t))
+	uniq := uniqueEntityName(clock, t)
+	replacer := strings.NewReplacer("{{uniq}}", uniq)
+	config = replacer.Replace(config)
+	for i := range assertions {
+		assertions[i] = replacer.Replace(assertions[i])
+	}
 	defer cleanup(t)
 	accProvider := testAccProvider(t, accProviders)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    accProviders,
 		CheckDestroy: checkDashboardDestroy(accProvider),
@@ -1063,11 +1120,14 @@ func testAccDatadogDashboardWidgetUtil(t *testing.T, config string, name string,
 }
 
 func testAccDatadogDashboardWidgetUtil_import(t *testing.T, config string, name string) {
-	accProviders, cleanup := testAccProviders(t, initRecorder(t))
+	accProviders, clock, cleanup := testAccProviders(t, initRecorder(t))
+	uniq := uniqueEntityName(clock, t)
+	replacer := strings.NewReplacer("{{uniq}}", uniq)
+	config = replacer.Replace(config)
 	defer cleanup(t)
 	accProvider := testAccProvider(t, accProviders)
 
-	resource.Test(t, resource.TestCase{
+	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
 		Providers:    accProviders,
 		CheckDestroy: checkDashboardDestroy(accProvider),

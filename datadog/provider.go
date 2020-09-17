@@ -73,8 +73,10 @@ func Provider() terraform.ResourceProvider {
 		},
 
 		DataSourcesMap: map[string]*schema.Resource{
-			"datadog_ip_ranges": dataSourceDatadogIpRanges(),
-			"datadog_monitor":   dataSourceDatadogMonitor(),
+			"datadog_dashboard_list":       dataSourceDatadogDashboarList(),
+			"datadog_ip_ranges":            dataSourceDatadogIpRanges(),
+			"datadog_monitor":              dataSourceDatadogMonitor(),
+			"datadog_synthetics_locations": dataSourceDatadogSyntheticsLocations(),
 		},
 
 		ConfigureFunc: providerConfigure,
@@ -99,10 +101,6 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 
 	if validate && (apiKey == "" || appKey == "") {
 		return nil, errors.New("api_key and app_key must be set unless validate = false")
-	}
-
-	if !validate && (apiKey != "" || appKey != "") {
-		return nil, errors.New("api_key and app_key must not be set when validate = false")
 	}
 
 	// Initialize the community client

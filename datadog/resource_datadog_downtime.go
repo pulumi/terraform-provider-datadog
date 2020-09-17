@@ -46,7 +46,9 @@ func resourceDatadogDowntime() *schema.Resource {
 				Optional: true,
 				DiffSuppressFunc: func(k, oldVal, newVal string, d *schema.ResourceData) bool {
 					_, startDatePresent := d.GetOk("start_date")
-					return startDatePresent
+					now := time.Now().Unix()
+					// If "start_date" is set, ignore diff for "start". If "start" isn't set, ignore diff if start is now or in the past
+					return startDatePresent || (newVal == "0" && oldVal != "0" && int64(d.Get("start").(int)) <= now)
 				},
 				Description: "Specify when this downtime should start",
 			},
@@ -95,7 +97,7 @@ func resourceDatadogDowntime() *schema.Resource {
 					Schema: map[string]*schema.Schema{
 						"period": {
 							Type:     schema.TypeInt,
-							Required: true,
+							Optional: true,
 						},
 						"type": {
 							Type:         schema.TypeString,
@@ -119,6 +121,11 @@ func resourceDatadogDowntime() *schema.Resource {
 								Type:         schema.TypeString,
 								ValidateFunc: validateDatadogDowntimeRecurrenceWeekDays,
 							},
+						},
+						"rrule": {
+							Type:          schema.TypeString,
+							Optional:      true,
+							ConflictsWith: []string{"recurrence.period", "recurrence.until_date", "recurrence.until_occurrences", "recurrence.week_days"},
 						},
 					},
 				},
@@ -265,6 +272,9 @@ func buildDowntimeStruct(authV1 context.Context, d *schema.ResourceData, client 
 			}
 			recurrence.SetWeekDays(weekDays)
 		}
+		if attr, ok := d.GetOk("recurrence.0.rrule"); ok {
+			recurrence.SetRrule(attr.(string))
+		}
 
 		dt.SetRecurrence(recurrence)
 	}
@@ -399,6 +409,9 @@ func resourceDatadogDowntimeRead(d *schema.ResourceData, meta interface{}) error
 			}
 			recurrence["week_days"] = weekDays
 		}
+		if attr, ok := r.GetRruleOk(); ok {
+			recurrence["rrule"] = attr
+		}
 		recurrenceList = append(recurrenceList, recurrence)
 		d.Set("recurrence", recurrenceList)
 	}
@@ -465,11 +478,11 @@ func resourceDatadogDowntimeImport(d *schema.ResourceData, meta interface{}) ([]
 func validateDatadogDowntimeRecurrenceType(v interface{}, k string) (ws []string, errors []error) {
 	value := v.(string)
 	switch value {
-	case "days", "months", "weeks", "years":
+	case "days", "months", "weeks", "years", "rrule":
 		break
 	default:
 		errors = append(errors, fmt.Errorf(
-			"%q contains an invalid recurrence type parameter %q. Valid parameters are days, months, weeks, or years", k, value))
+			"%q contains an invalid recurrence type parameter %q. Valid parameters are days, months, weeks, years, or rrule", k, value))
 	}
 	return
 }

@@ -1,7 +1,11 @@
 package datadog
 
 import (
+	"fmt"
+	"regexp"
 	"testing"
+
+	"github.com/hashicorp/terraform-plugin-sdk/helper/resource"
 )
 
 // JSON export used as test scenario
@@ -43,7 +47,7 @@ import (
 
 const datadogDashboardNoteConfig = `
 resource "datadog_dashboard" "note_dashboard" {
-	title         = "Acceptance Test Notes Widget Dashboard"
+	title         = "{{uniq}}"
 	description   = "Created using the Datadog provider in Terraform"
 	layout_type   = "ordered"
 	is_read_only  = "true"
@@ -62,10 +66,26 @@ resource "datadog_dashboard" "note_dashboard" {
 }
 `
 
+func datadogDashboardNoteConfigNoContent(uniq string) string {
+	return fmt.Sprintf(`
+resource "datadog_dashboard" "note_dashboard" {
+	title         = "%s"
+	description   = "Created using the Datadog provider in Terraform"
+	layout_type   = "ordered"
+	is_read_only  = "true"
+
+	widget {
+		note_definition {
+			content = ""
+		}
+	}
+}`, uniq)
+}
+
 var datadogDashboardNoteAsserts = []string{
 	"description = Created using the Datadog provider in Terraform",
 	"widget.0.note_definition.0.content = This is a note widget",
-	"title = Acceptance Test Notes Widget Dashboard",
+	"title = {{uniq}}",
 	"widget.0.note_definition.0.font_size = 18",
 	"widget.0.note_definition.0.text_align = center",
 	"widget.0.note_definition.0.show_tick = true",
@@ -82,4 +102,21 @@ func TestAccDatadogDashboardNote(t *testing.T) {
 
 func TestAccDatadogDashboardNote_import(t *testing.T) {
 	testAccDatadogDashboardWidgetUtil_import(t, datadogDashboardNoteConfig, "datadog_dashboard.note_dashboard")
+}
+
+func TestAccDatadogDashboardNoteContentError(t *testing.T) {
+	accProviders, clock, cleanup := testAccProviders(t, initRecorder(t))
+	uniq := uniqueEntityName(clock, t)
+	defer cleanup(t)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { testAccPreCheck(t) },
+		Providers: accProviders,
+		Steps: []resource.TestStep{
+			{
+				Config:      datadogDashboardNoteConfigNoContent(uniq),
+				ExpectError: regexp.MustCompile("expected \"widget.0.note_definition.0.content\" to not be an empty string"),
+			},
+		},
+	})
 }

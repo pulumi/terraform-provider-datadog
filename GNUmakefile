@@ -1,6 +1,5 @@
 TEST?=$$(go list ./... |grep -v 'vendor')
 GOFMT_FILES?=$$(find . -name '*.go' |grep -v vendor)
-WEBSITE_REPO=github.com/hashicorp/terraform-website
 PKG_NAME=datadog
 DIR=~/.terraform.d/plugins
 ZORKIAN_VERSION=master
@@ -18,17 +17,17 @@ install: fmtcheck
 uninstall:
 	@rm -vf $(DIR)/terraform-provider-datadog
 
-test: fmtcheck
+test: get-test-deps fmtcheck
 	go test -i $(TEST) || exit 1
 	echo $(TEST) | \
-		xargs -t -n4 go test $(TESTARGS) -timeout=30s -parallel=4
-	DD_API_KEY=fake DD_APP_KEY=fake RECORD=false TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout=10m
+		xargs -t -n4 gotestsum --format testname -- $(TESTARGS) -timeout=30s -parallel=4
+	DD_API_KEY=fake DD_APP_KEY=fake RECORD=false TF_ACC=1 gotestsum --format testname -- $(TEST) -v $(TESTARGS) -timeout=15m
 
-testacc: fmtcheck
-	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 120m
+testacc: get-test-deps fmtcheck
+	TF_ACC=1 gotestsum --format testname -- $(TEST) -v $(TESTARGS) -timeout 120m
 
-cassettes: fmtcheck
-	RECORD=true TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 120m
+cassettes: get-test-deps fmtcheck
+	RECORD=true TF_ACC=1 gotestsum --format testname -- $(TEST) -v $(TESTARGS) -timeout 120m
 
 vet:
 	@echo "go vet ."
@@ -49,27 +48,13 @@ errcheck:
 	@sh -c "'$(CURDIR)/scripts/errcheck.sh'"
 
 
-test-compile:
+test-compile: get-test-deps
 	@if [ "$(TEST)" = "./..." ]; then \
 		echo "ERROR: Set TEST to a specific package. For example,"; \
 		echo "  make test-compile TEST=./$(PKG_NAME)"; \
 		exit 1; \
 	fi
-	go test -c $(TEST) $(TESTARGS)
-
-website:
-ifeq (,$(wildcard $(GOPATH)/src/$(WEBSITE_REPO)))
-	echo "$(WEBSITE_REPO) not found in your GOPATH (necessary for layouts and assets), get-ting..."
-	git clone https://$(WEBSITE_REPO) $(GOPATH)/src/$(WEBSITE_REPO)
-endif
-	@$(MAKE) -C $(GOPATH)/src/$(WEBSITE_REPO) website-provider PROVIDER_PATH=$(shell pwd) PROVIDER_NAME=$(PKG_NAME)
-
-website-test:
-ifeq (,$(wildcard $(GOPATH)/src/$(WEBSITE_REPO)))
-	echo "$(WEBSITE_REPO) not found in your GOPATH (necessary for layouts and assets), get-ting..."
-	git clone https://$(WEBSITE_REPO) $(GOPATH)/src/$(WEBSITE_REPO)
-endif
-	@$(MAKE) -C $(GOPATH)/src/$(WEBSITE_REPO) website-provider-test PROVIDER_PATH=$(shell pwd) PROVIDER_NAME=$(PKG_NAME)
+	gotestsum --format testname -- -c $(TEST) $(TESTARGS)
 
 update-go-client:
 	echo "Updating the Zorkian client to ${ZORKIAN_VERSION} and the API Client to ${API_CLIENT_VERSION}"
@@ -78,4 +63,7 @@ update-go-client:
 	go mod vendor
 	go mod tidy
 
-.PHONY: build test testacc cassettes vet fmt fmtcheck errcheck test-compile website website-test
+get-test-deps:
+	cd `mktemp -d`;	GO111MODULE=auto GOFLAGS='' go get -u gotest.tools/gotestsum; cd -
+
+.PHONY: build test testacc cassettes vet fmt fmtcheck errcheck test-compile get-test-deps
