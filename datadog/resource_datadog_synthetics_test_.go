@@ -1,4 +1,4 @@
-// For more info about writing custom provider: shttps://www.terraform.io/docs/extend/writing-custom-providers.html
+// For more info about writing custom provider: https://www.terraform.io/docs/extend/writing-custom-providers.html
 
 package datadog
 
@@ -6,8 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	_nethttp "net/http"
+	"regexp"
 	"strconv"
-	"strings"
 
 	datadogV1 "github.com/DataDog/datadog-api-client-go/api/v1/datadog"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
@@ -15,7 +16,8 @@ import (
 )
 
 var syntheticsTypes = []string{"api", "browser"}
-var syntheticsSubTypes = []string{"http", "ssl", "tcp"}
+var syntheticsSubTypes = []string{"http", "ssl", "tcp", "dns"}
+var syntheticsVariableTypes = []string{"element", "email", "global", "text"}
 
 func resourceDatadogSyntheticsTest() *schema.Resource {
 	return &schema.Resource{
@@ -68,6 +70,17 @@ func resourceDatadogSyntheticsTest() *schema.Resource {
 							Required:  true,
 							Sensitive: true,
 						},
+					},
+				},
+			},
+			"request_client_certificate": {
+				Type:     schema.TypeList,
+				Optional: true,
+				MaxItems: 1,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"cert": syntheticsTestRequestClientCertificateItem(),
+						"key":  syntheticsTestRequestClientCertificateItem(),
 					},
 				},
 			},
@@ -126,6 +139,36 @@ func resourceDatadogSyntheticsTest() *schema.Resource {
 					},
 				},
 			},
+			"variable": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"example": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+						"id": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+						"name": {
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.StringMatch(regexp.MustCompile(`^[A-Z][A-Z0-9_]+[A-Z0-9]$`), "must be all uppercase with underscores"),
+						},
+						"pattern": {
+							Type:     schema.TypeString,
+							Optional: true,
+						},
+						"type": {
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.StringInSlice(syntheticsVariableTypes, false),
+						},
+					},
+				},
+			},
 			"device_ids": {
 				Type:     schema.TypeList,
 				Optional: true,
@@ -151,7 +194,7 @@ func resourceDatadogSyntheticsTest() *schema.Resource {
 			},
 			"tags": {
 				Type:     schema.TypeList,
-				Required: true,
+				Optional: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 			},
 			"status": {
@@ -199,6 +242,31 @@ func syntheticsTestRequest() *schema.Schema {
 					Optional: true,
 					Default:  60,
 				},
+				"dns_server": {
+					Type:     schema.TypeString,
+					Optional: true,
+				},
+			},
+		},
+	}
+}
+
+func syntheticsTestRequestClientCertificateItem() *schema.Schema {
+	return &schema.Schema{
+		Type:     schema.TypeList,
+		MaxItems: 1,
+		Required: true,
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"content": {
+					Type:     schema.TypeString,
+					Required: true,
+				},
+				"filename": {
+					Type:     schema.TypeString,
+					Optional: true,
+					Default:  "Provided in Terraform config",
+				},
 			},
 		},
 	}
@@ -210,11 +278,6 @@ func syntheticsTestOptions() *schema.Schema {
 		ConflictsWith: []string{"options_list"},
 		Deprecated:    "This parameter is deprecated, please use `options_list`",
 		DiffSuppressFunc: func(key, old, new string, d *schema.ResourceData) bool {
-			// DiffSuppressFunc is useless if options_list exists
-			if _, isOptionsV2 := d.GetOk("options_list"); isOptionsV2 {
-				return isOptionsV2
-			}
-
 			if key == "options.follow_redirects" || key == "options.accept_self_signed" || key == "options.allow_insecure" {
 				// TF nested schemas is limited to string values only
 				// follow_redirects, accept_self_signed and allow_insecure being booleans in Datadog json api
@@ -433,11 +496,12 @@ func resourceDatadogSyntheticsTestRead(d *schema.ResourceData, meta interface{})
 
 	var syntheticsTest datadogV1.SyntheticsTestDetails
 	var err error
+	var httpresp *_nethttp.Response
 
 	if d.Get("type") == "browser" {
-		syntheticsTest, _, err = datadogClientV1.SyntheticsApi.GetBrowserTest(authV1, d.Id()).Execute()
+		syntheticsTest, httpresp, err = datadogClientV1.SyntheticsApi.GetBrowserTest(authV1, d.Id()).Execute()
 	} else {
-		syntheticsTest, _, err = datadogClientV1.SyntheticsApi.GetTest(authV1, d.Id()).Execute()
+		syntheticsTest, httpresp, err = datadogClientV1.SyntheticsApi.GetTest(authV1, d.Id()).Execute()
 
 		// re-fetch test if it was actually a browser but we didn't have the info earlier
 		if syntheticsTest.GetType() == "browser" {
@@ -446,7 +510,7 @@ func resourceDatadogSyntheticsTestRead(d *schema.ResourceData, meta interface{})
 	}
 
 	if err != nil {
-		if strings.Contains(err.Error(), "404 Not Found") {
+		if httpresp != nil && httpresp.StatusCode == 404 {
 			// Delete the resource from the local state since it doesn't exist anymore in the actual state
 			d.SetId("")
 			return nil
@@ -518,6 +582,9 @@ func buildSyntheticsTestStruct(d *schema.ResourceData) *datadogV1.SyntheticsTest
 		portInt, _ := strconv.Atoi(attr.(string))
 		request.SetPort(int64(portInt))
 	}
+	if attr, ok := d.GetOk("request.dns_server"); ok {
+		request.SetDnsServer(attr.(string))
+	}
 	if attr, ok := d.GetOk("request_query"); ok {
 		query := attr.(map[string]interface{})
 		if len(query) > 0 {
@@ -538,6 +605,32 @@ func buildSyntheticsTestStruct(d *schema.ResourceData) *datadogV1.SyntheticsTest
 		for k, v := range headers {
 			request.GetHeaders()[k] = v.(string)
 		}
+	}
+
+	if _, ok := d.GetOk("request_client_certificate"); ok {
+		cert := datadogV1.SyntheticsTestRequestCertificateItem{}
+		key := datadogV1.SyntheticsTestRequestCertificateItem{}
+
+		if attr, ok := d.GetOk("request_client_certificate.0.cert.0.filename"); ok {
+			cert.SetFilename(attr.(string))
+		}
+		if attr, ok := d.GetOk("request_client_certificate.0.cert.0.content"); ok {
+			cert.SetContent(attr.(string))
+		}
+
+		if attr, ok := d.GetOk("request_client_certificate.0.key.0.filename"); ok {
+			key.SetFilename(attr.(string))
+		}
+		if attr, ok := d.GetOk("request_client_certificate.0.key.0.content"); ok {
+			key.SetContent(attr.(string))
+		}
+
+		clientCertificate := datadogV1.SyntheticsTestRequestCertificate{
+			Cert: &cert,
+			Key:  &key,
+		}
+
+		request.SetCertificate(clientCertificate)
 	}
 
 	config := datadogV1.NewSyntheticsTestConfig([]datadogV1.SyntheticsAssertion{}, *request)
@@ -617,6 +710,30 @@ func buildSyntheticsTestStruct(d *schema.ResourceData) *datadogV1.SyntheticsTest
 							log.Printf("[WARN] targetjsonpath shouldn't be specified for non-validateJSONPath operator, only target")
 						}
 						config.Assertions = append(config.Assertions, datadogV1.SyntheticsAssertionTargetAsSyntheticsAssertion(assertionTarget))
+					}
+				}
+			}
+		}
+	}
+
+	if attr, ok := d.GetOk("variable"); ok && attr != nil {
+		for _, variable := range attr.([]interface{}) {
+			variableMap := variable.(map[string]interface{})
+			if v, ok := variableMap["type"]; ok {
+				if variableType, err := convertToSyntheticsBrowserVariableType(v.(string)); err == nil {
+					if v, ok := variableMap["name"]; ok {
+						variableName := v.(string)
+						newVariable := datadogV1.NewSyntheticsBrowserVariable(variableName, variableType)
+						if v, ok := variableMap["example"]; ok && v.(string) != "" {
+							newVariable.SetExample(v.(string))
+						}
+						if v, ok := variableMap["id"]; ok && v.(string) != "" {
+							newVariable.SetId(v.(string))
+						}
+						if v, ok := variableMap["pattern"]; ok && v.(string) != "" {
+							newVariable.SetPattern(v.(string))
+						}
+						config.SetVariables(append(config.GetVariables(), *newVariable))
 					}
 				}
 			}
@@ -807,6 +924,9 @@ func updateSyntheticsTestLocalState(d *schema.ResourceData, syntheticsTest *data
 	if actualRequest.HasPort() {
 		localRequest["port"] = convertToString(actualRequest.GetPort())
 	}
+	if actualRequest.HasDnsServer() {
+		localRequest["dns_server"] = convertToString(actualRequest.GetDnsServer())
+	}
 	d.Set("request", localRequest)
 	d.Set("request_headers", actualRequest.Headers)
 	d.Set("request_query", actualRequest.GetQuery())
@@ -815,6 +935,32 @@ func updateSyntheticsTestLocalState(d *schema.ResourceData, syntheticsTest *data
 		localAuth["username"] = basicAuth.Username
 		localAuth["password"] = basicAuth.Password
 		d.Set("request_basicauth", []map[string]string{localAuth})
+	}
+
+	if clientCertificate, ok := actualRequest.GetCertificateOk(); ok {
+		localCertificate := make(map[string][]map[string]string)
+		localCertificate["cert"] = make([]map[string]string, 1)
+		localCertificate["cert"][0] = make(map[string]string)
+		localCertificate["key"] = make([]map[string]string, 1)
+		localCertificate["key"][0] = make(map[string]string)
+
+		cert := clientCertificate.GetCert()
+		localCertificate["cert"][0]["filename"] = cert.GetFilename()
+
+		key := clientCertificate.GetKey()
+		localCertificate["key"][0]["filename"] = key.GetFilename()
+
+		// the content of the certificate and the key are write-only
+		// so we need to get them from the config since they will
+		// not be in the api response
+		if configCertificateContent, ok := d.GetOk("request_client_certificate.0.cert.0.content"); ok {
+			localCertificate["cert"][0]["content"] = configCertificateContent.(string)
+		}
+		if configKeyContent, ok := d.GetOk("request_client_certificate.0.key.0.content"); ok {
+			localCertificate["key"][0]["content"] = configKeyContent.(string)
+		}
+
+		d.Set("request_client_certificate", []map[string][]map[string]string{localCertificate})
 	}
 
 	actualAssertions := syntheticsTest.GetConfig().Assertions
@@ -871,6 +1017,31 @@ func updateSyntheticsTestLocalState(d *schema.ResourceData, syntheticsTest *data
 		if err := d.Set("assertion", localAssertions); err != nil {
 			return err
 		}
+	}
+
+	actualVariables := *syntheticsTest.GetConfig().Variables
+	localVariables := make([]map[string]interface{}, len(actualVariables))
+	for i, variable := range actualVariables {
+		localVariable := make(map[string]interface{})
+		if v, ok := variable.GetTypeOk(); ok {
+			localVariable["type"] = *v
+		}
+		if v, ok := variable.GetNameOk(); ok {
+			localVariable["name"] = *v
+		}
+		if v, ok := variable.GetExampleOk(); ok {
+			localVariable["example"] = *v
+		}
+		if v, ok := variable.GetIdOk(); ok {
+			localVariable["id"] = *v
+		}
+		if v, ok := variable.GetPatternOk(); ok {
+			localVariable["pattern"] = *v
+		}
+		localVariables[i] = localVariable
+	}
+	if err := d.Set("variable", localVariables); err != nil {
+		return err
 	}
 
 	d.Set("device_ids", syntheticsTest.GetOptions().DeviceIds)
@@ -988,5 +1159,20 @@ func convertToString(i interface{}) string {
 			return string(valStrr)
 		}
 		return ""
+	}
+}
+
+func convertToSyntheticsBrowserVariableType(s string) (datadogV1.SyntheticsBrowserVariableType, error) {
+	switch s {
+	case "element":
+		return datadogV1.SYNTHETICSBROWSERVARIABLETYPE_ELEMENT, nil
+	case "email":
+		return datadogV1.SYNTHETICSBROWSERVARIABLETYPE_EMAIL, nil
+	case "global":
+		return datadogV1.SYNTHETICSBROWSERVARIABLETYPE_GLOBAL, nil
+	case "text":
+		return datadogV1.SYNTHETICSBROWSERVARIABLETYPE_TEXT, nil
+	default:
+		return "", fmt.Errorf("variable.type must be one of ['element', 'email', 'global', 'text'], got: %s", s)
 	}
 }

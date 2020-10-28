@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/url"
 	"runtime"
+	"strings"
 
 	datadogV1 "github.com/DataDog/datadog-api-client-go/api/v1/datadog"
 	datadogV2 "github.com/DataDog/datadog-api-client-go/api/v2/datadog"
@@ -19,7 +20,10 @@ import (
 	datadogCommunity "github.com/zorkian/go-datadog-api"
 )
 
-var datadogProvider *schema.Provider
+var (
+	datadogProvider       *schema.Provider
+	baseIpRangesSubdomain = "ip-ranges"
+)
 
 func Provider() terraform.ResourceProvider {
 	datadogProvider = &schema.Provider{
@@ -58,6 +62,7 @@ func Provider() terraform.ResourceProvider {
 			"datadog_integration_pagerduty":                resourceDatadogIntegrationPagerduty(),
 			"datadog_integration_pagerduty_service_object": resourceDatadogIntegrationPagerdutySO(),
 			"datadog_logs_archive":                         resourceDatadogLogsArchive(),
+			"datadog_logs_archive_order":                   resourceDatadogLogsArchiveOrder(),
 			"datadog_logs_custom_pipeline":                 resourceDatadogLogsCustomPipeline(),
 			"datadog_logs_index":                           resourceDatadogLogsIndex(),
 			"datadog_logs_index_order":                     resourceDatadogLogsIndexOrder(),
@@ -68,12 +73,13 @@ func Provider() terraform.ResourceProvider {
 			"datadog_screenboard":                          resourceDatadogScreenboard(),
 			"datadog_service_level_objective":              resourceDatadogServiceLevelObjective(),
 			"datadog_synthetics_test":                      resourceDatadogSyntheticsTest(),
+			"datadog_synthetics_global_variable":           resourceDatadogSyntheticsGlobalVariable(),
 			"datadog_timeboard":                            resourceDatadogTimeboard(),
 			"datadog_user":                                 resourceDatadogUser(),
 		},
 
 		DataSourcesMap: map[string]*schema.Resource{
-			"datadog_dashboard_list":       dataSourceDatadogDashboarList(),
+			"datadog_dashboard_list":       dataSourceDatadogDashboardList(),
 			"datadog_ip_ranges":            dataSourceDatadogIpRanges(),
 			"datadog_monitor":              dataSourceDatadogMonitor(),
 			"datadog_synthetics_locations": dataSourceDatadogSyntheticsLocations(),
@@ -170,6 +176,24 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		authV1 = context.WithValue(authV1, datadogV1.ContextServerVariables, map[string]string{
 			"name":     parsedApiUrl.Host,
 			"protocol": parsedApiUrl.Scheme,
+		})
+
+		// Configure URL's per operation
+		// IPRangesApiService.GetIPRanges
+		ipRangesDNSNameArr := strings.Split(parsedApiUrl.Hostname(), ".")
+		// Parse out subdomain if it exists
+		if len(ipRangesDNSNameArr) > 2 {
+			ipRangesDNSNameArr = ipRangesDNSNameArr[1:]
+		}
+		ipRangesDNSNameArr = append([]string{baseIpRangesSubdomain}, ipRangesDNSNameArr...)
+
+		authV1 = context.WithValue(authV1, datadogV1.ContextOperationServerIndices, map[string]int{
+			"IPRangesApiService.GetIPRanges": 1,
+		})
+		authV1 = context.WithValue(authV1, datadogV1.ContextOperationServerVariables, map[string]map[string]string{
+			"IPRangesApiService.GetIPRanges": {
+				"name": strings.Join(ipRangesDNSNameArr, "."),
+			},
 		})
 	}
 

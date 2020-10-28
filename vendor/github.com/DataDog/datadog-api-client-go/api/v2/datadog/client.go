@@ -56,6 +56,10 @@ type APIClient struct {
 
 	SecurityMonitoringApi *SecurityMonitoringApiService
 
+	ServicesApi *ServicesApiService
+
+	TeamsApi *TeamsApiService
+
 	UsersApi *UsersApiService
 }
 
@@ -80,6 +84,8 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.LogsArchivesApi = (*LogsArchivesApiService)(&c.common)
 	c.RolesApi = (*RolesApiService)(&c.common)
 	c.SecurityMonitoringApi = (*SecurityMonitoringApiService)(&c.common)
+	c.ServicesApi = (*ServicesApiService)(&c.common)
+	c.TeamsApi = (*TeamsApiService)(&c.common)
 	c.UsersApi = (*UsersApiService)(&c.common)
 
 	return c
@@ -355,6 +361,7 @@ func (c *APIClient) prepareRequest(
 		if auth, ok := ctx.Value(ContextAccessToken).(string); ok {
 			localVarRequest.Header.Add("Authorization", "Bearer "+auth)
 		}
+
 	}
 
 	for header, value := range c.cfg.DefaultHeader {

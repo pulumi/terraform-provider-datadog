@@ -107,6 +107,35 @@ resource "datadog_synthetics_test" "test_tcp" {
 }
 ```
 
+## Example Usage (Synthetics DNS test)
+
+Create a new Datadog Synthetics API/DNS test on example.org
+
+```hcl
+resource "datadog_synthetics_test" "test_tcp" {
+  type = "api"
+  subtype = "dns"
+  request = {
+    host = "example.org"
+  }
+  assertion {
+    type = "recordSome"
+    operator = "is"
+    property = "A"
+    target = "0.0.0.0"
+  }
+  locations = [ "aws:eu-central-1" ]
+  options_list {
+    tick_every = 900
+  }
+  name = "An API test on example.org"
+  message = "Notify @pagerduty"
+  tags = ["foo:bar", "foo", "env:test"]
+
+  status = "live"
+}
+```
+
 ## Example Usage (Synthetics Browser test)
 
 Support for Synthetics Browser test steps is limited (see [below](#synthetics-browser-test))
@@ -142,6 +171,26 @@ resource "datadog_synthetics_test" "test_browser" {
         "value": "datadoghq"
     })
   }
+
+  variable {
+    type    = "text"
+    name    = "MY_PATTERN_VAR"
+    pattern = "{{numeric(3)}}"
+    example = "597"
+  }
+
+  variable {
+    type    = "email"
+    name    = "MY_EMAIL_VAR"
+    pattern = "jd8-afe-ydv.{{ numeric(10) }}@synthetics.dtdg.co"
+    example = "jd8-afe-ydv.4546132139@synthetics.dtdg.co"
+  }
+
+  variable {
+    type = "global"
+    name = "MY_GLOBAL_VAR"
+    id   = "76636cd1-82e2-4aeb-9cfe-51366a8198a2"
+  }
 }
 ```
 
@@ -150,19 +199,20 @@ resource "datadog_synthetics_test" "test_browser" {
 The following arguments are supported:
 
 - `type`: (Required) Synthetics test type (api or browser)
-- `subtype`: (Optional) For type=api, http, ssl or tcp (Default = http)
+- `subtype`: (Optional) For type=api, http, ssl, tcp or dns (Default = http)
 - `name`: (Required) Name of Datadog synthetics test
 - `message`: (Required) A message to include with notifications for this synthetics test. Email notifications can be sent to specific users by using the same '@username' notation as events.
-- `tags`: (Required) A list of tags to associate with your synthetics test. This can help you categorize and filter tests in the manage synthetics page of the UI.
+- `tags`: (Optional) A list of tags to associate with your synthetics test. This can help you categorize and filter tests in the manage synthetics page of the UI. Default is an empty list ([]).
 - `request`: (Required) if type=api and subtype=http
   - `method`: (Optional) For type=api and subtype=http, one of DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT
   - `url`: (Required) Any url
   - `timeout`: (Optional) For type=api, any value between 0 and 60 (Default = 60)
   - `body`: (Optional) Request body
-- `request`: (Required) if type=api and subtype=ssl or subtype=tcp
+- `request`: (Required) if type=api and subtype=ssl or subtype=tcp or subtype=dns
   - `host`: (Required) host name
   - `port`: (Required) port number
   - `timeout`: (Optional) For type=api, any value between 0 and 60 (Default = 60)
+  - `dns_server`: (Optional) For subtype=dns, DNS server to use
 - `request`: (Required) if type=browser
   - `method`: (Required) no-op, use GET
   - `url`: (Required) Any url
@@ -171,6 +221,13 @@ The following arguments are supported:
 - `request_basicauth`: (Optional) Array of 1 item containing HTTP basic authentication credentials
   - `username`: (Required) Username for authentication
   - `password`: (Required) Password for authentication
+- `request_client_certificate`: (Optional) Client certificate to use when performing the test request
+  - `cert`
+    - `content`: (Required) Content of the client certificate
+    - `filename`: (Optional) Filename for the certificate
+  - `key`
+    - `content`: (Required) Content of the certificate key
+    - `filename`: (Optional) Filename for the certificate key
 - `assertion`: (Required) Array of 1 to 10 items, only some combinations of type/operator are valid (please refer to Datadog documentation).
   - `type`: (Required) body, header, responseTime, statusCode
   - `operator`: (Required) Please refer to [Datadog documentation](https://docs.datadoghq.com/synthetics/api_test/#validation) as operator depend on assertion type
@@ -210,6 +267,12 @@ The following arguments are supported:
   - `params`: (Required) Parameters for the step as JSON string.
   - `allow_failure`: (Optional) Determines if the step should be allowed to fail.
   - `timeout`: (Optional) Used to override the default timeout of a step.
+- `variable`: (Optional) Array of variables used for the test.
+  - `type`: (Required) Type of browser test variable. Allowed enum values: "element","email","global","text"
+  - `name`: (Required) Name of the variable.
+  - `example`: (Optional) Example for the variable.
+  - `id`: (Optional) ID of the global variable to use. This is actually only used (and required) in the case of using a variable of type "global".
+  - `pattern`: (Optional) Pattern of the variable.
 
 ## Attributes Reference
 

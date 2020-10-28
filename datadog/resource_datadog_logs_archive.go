@@ -58,6 +58,18 @@ func resourceDatadogLogsArchive() *schema.Resource {
 					},
 				},
 			},
+			"rehydration_tags": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
+			"include_tags": {
+				Type:     schema.TypeBool,
+				Optional: true,
+				Default:  false,
+			},
 		},
 	}
 }
@@ -99,6 +111,13 @@ func resourceDatadogLogsArchiveRead(d *schema.ResourceData, meta interface{}) er
 		return err
 	}
 	if err := d.Set(archiveType, destination); err != nil {
+		return err
+	}
+
+	if err = d.Set("rehydration_tags", ddArchive.Data.Attributes.RehydrationTags); err != nil {
+		return err
+	}
+	if err = d.Set("include_tags", ddArchive.Data.Attributes.IncludeTags); err != nil {
 		return err
 	}
 	return nil
@@ -209,6 +228,8 @@ func buildDatadogArchiveCreateReq(d *schema.ResourceData) (*datadogV2.LogsArchiv
 		d.Get("name").(string),
 		d.Get("query").(string),
 	)
+	attributes.SetRehydrationTags(getRehydrationTags(d))
+	attributes.SetIncludeTags(d.Get("include_tags").(bool))
 	definition := datadogV2.NewLogsArchiveCreateRequestDefinitionWithDefaults()
 	definition.SetAttributes(*attributes)
 	archive.SetData(*definition)
@@ -352,4 +373,13 @@ func buildS3Destination(d map[string]interface{}) (*datadogV2.LogsArchiveDestina
 	)
 	destination.Path = datadogV2.PtrString(path.(string))
 	return destination, nil
+}
+
+func getRehydrationTags(d *schema.ResourceData) []string {
+	tfList := d.Get("rehydration_tags").([]interface{})
+	ddList := make([]string, len(tfList))
+	for i, tfName := range tfList {
+		ddList[i] = tfName.(string)
+	}
+	return ddList
 }
