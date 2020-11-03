@@ -65,6 +65,8 @@ func TestAccDatadogMonitor_Basic(t *testing.T) {
 						"datadog_monitor.foo", "tags.2644851163", "baz"),
 					resource.TestCheckResourceAttr(
 						"datadog_monitor.foo", "tags.1750285118", "foo:bar"),
+					resource.TestCheckResourceAttr(
+						"datadog_monitor.foo", "priority", "3"),
 				),
 			},
 		},
@@ -121,6 +123,8 @@ func TestAccDatadogMonitorServiceCheck_Basic(t *testing.T) {
 						"datadog_monitor.foo", "tags.2644851163", "baz"),
 					resource.TestCheckResourceAttr(
 						"datadog_monitor.foo", "tags.1750285118", "foo:bar"),
+					resource.TestCheckResourceAttr(
+						"datadog_monitor.foo", "priority", "3"),
 				),
 			},
 		},
@@ -230,6 +234,8 @@ func TestAccDatadogMonitor_Updated(t *testing.T) {
 						"datadog_monitor.foo", "tags.2644851163", "baz"),
 					resource.TestCheckResourceAttr(
 						"datadog_monitor.foo", "tags.1750285118", "foo:bar"),
+					resource.TestCheckResourceAttr(
+						"datadog_monitor.foo", "priority", "3"),
 				),
 			},
 			{
@@ -285,6 +291,8 @@ func TestAccDatadogMonitor_Updated(t *testing.T) {
 						"datadog_monitor.foo", "tags.1280427750", "baz:qux"),
 					resource.TestCheckResourceAttr(
 						"datadog_monitor.foo", "tags.1520885421", "quux"),
+					resource.TestCheckResourceAttr(
+						"datadog_monitor.foo", "priority", "3"),
 				),
 			},
 			{
@@ -847,6 +855,37 @@ func TestAccDatadogMonitor_SilencedUpdatePastTimestamp(t *testing.T) {
 	})
 }
 
+func TestAccDatadogMonitor_ZeroDelay(t *testing.T) {
+	accProviders, clock, cleanup := testAccProviders(t, initRecorder(t))
+	monitorName := uniqueEntityName(clock, t)
+	defer cleanup(t)
+	accProvider := testAccProvider(t, accProviders)
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    accProviders,
+		CheckDestroy: testAccCheckDatadogMonitorDestroy(accProvider),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckDatadogMonitorConfigZeroDelay(monitorName),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckDatadogMonitorExists(accProvider, "datadog_monitor.foo"),
+					resource.TestCheckResourceAttr(
+						"datadog_monitor.foo", "name", monitorName),
+					resource.TestCheckResourceAttr(
+						"datadog_monitor.foo", "message", "some message Notify: @hipchat-channel"),
+					resource.TestCheckResourceAttr(
+						"datadog_monitor.foo", "type", "query alert"),
+					resource.TestCheckResourceAttr(
+						"datadog_monitor.foo", "query", "avg(last_1h):avg:aws.ec2.cpu{environment:foo,host:foo} by {host} > 2"),
+					resource.TestCheckResourceAttr(
+						"datadog_monitor.foo", "new_host_delay", "0"),
+				),
+			},
+		},
+	})
+}
+
 func testAccCheckDatadogMonitorSilenceZero(uniq string) string {
 	return fmt.Sprintf(`
 resource "datadog_monitor" "foo" {
@@ -899,6 +938,7 @@ resource "datadog_monitor" "foo" {
   type = "query alert"
   message = "some message Notify: @hipchat-channel"
   escalation_message = "the situation has escalated @pagerduty"
+  priority = 3
 
   query = "avg(last_1h):avg:aws.ec2.cpu{environment:foo,host:foo} by {host} > 2"
 
@@ -921,6 +961,7 @@ resource "datadog_monitor" "foo" {
   tags = ["foo:bar", "baz"]
 }`, uniq)
 }
+
 func testAccCheckDatadogMonitorConfigNoThresholds(uniq string) string {
 	return fmt.Sprintf(`
 resource "datadog_monitor" "foo" {
@@ -950,6 +991,7 @@ resource "datadog_monitor" "foo" {
   type = "service check"
   message = "some message Notify: @hipchat-channel"
   escalation_message = "the situation has escalated @pagerduty"
+  priority = 3
 
   query = "\"custom.check\".over(\"environment:foo\").last(2).count_by_status()"
 
@@ -1040,6 +1082,7 @@ resource "datadog_monitor" "foo" {
   type = "query alert"
   message = "a different message Notify: @hipchat-channel"
   escalation_message = "the situation has escalated! @pagerduty"
+  priority = 3
 
   query = "avg(last_1h):avg:aws.ec2.cpu{environment:bar,host:bar} by {host} > 3"
 
@@ -1075,6 +1118,7 @@ resource "datadog_monitor" "foo" {
   type = "query alert"
   message = "a different message Notify: @hipchat-channel"
   escalation_message = "the situation has escalated! @pagerduty"
+  priority = 3
 
   query = "avg(last_1h):avg:aws.ec2.cpu{environment:bar,host:bar} by {host} > 3"
 
@@ -1108,6 +1152,7 @@ resource "datadog_monitor" "complex_metric_alert_example_monitor" {
   name = "%s"
   type = "metric alert"
   message = "a message"
+  priority = 3
 
   query = "change(min(last_1m),last_5m):sum:org.eclipse.jetty.servlet.ServletContextHandler.5xx_responses{example,framework:chronos} + sum:org.eclipse.jetty.servlet.ServletContextHandler.4xx_responses{example,framework:chronos} + sum:org.eclipse.jetty.servlet.ServletContextHandler.3xx_responses{example,framework:chronos} > 5"
 }`, uniq)
@@ -1119,6 +1164,7 @@ resource "datadog_monitor" "complex_query_alert_example_monitor" {
   name = "%s"
   type = "query alert"
   message = "a message"
+  priority = 3
 
   query = "change(min(last_1m),last_5m):sum:org.eclipse.jetty.servlet.ServletContextHandler.5xx_responses{example,framework:chronos} + sum:org.eclipse.jetty.servlet.ServletContextHandler.4xx_responses{example,framework:chronos} + sum:org.eclipse.jetty.servlet.ServletContextHandler.3xx_responses{example,framework:chronos} > 5"
 }`, uniq)
@@ -1324,6 +1370,26 @@ resource "datadog_monitor" "bar" {
   	message = "test"
 	query = "${datadog_monitor.foo.id} || ${datadog_synthetics_test.foo.monitor_id}"
 }`, uniq, uniq, uniq)
+}
+
+func testAccCheckDatadogMonitorConfigZeroDelay(uniq string) string {
+	return fmt.Sprintf(`
+resource "datadog_monitor" "foo" {
+  name = "%s"
+  type = "query alert"
+  message = "some message Notify: @hipchat-channel"
+
+  query = "avg(last_1h):avg:aws.ec2.cpu{environment:foo,host:foo} by {host} > 2"
+
+  thresholds = {
+	warning = "1.0"
+	critical = "2.0"
+	warning_recovery = "0.5"
+	critical_recovery = "1.5"
+  }
+
+  new_host_delay = 0
+}`, uniq)
 }
 
 func destroyHelper(s *terraform.State, client *datadog.Client) error {
