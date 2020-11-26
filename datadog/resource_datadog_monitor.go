@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	datadogV1 "github.com/DataDog/datadog-api-client-go/api/v1/datadog"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
@@ -482,7 +481,7 @@ func resourceDatadogMonitorRead(d *schema.ResourceData, meta interface{}) error 
 	d.Set("new_host_delay", m.Options.GetNewHostDelay())
 	d.Set("evaluation_delay", m.Options.GetEvaluationDelay())
 	d.Set("notify_no_data", m.Options.GetNotifyNoData())
-	d.Set("no_data_timeframe", m.Options.NoDataTimeframe)
+	d.Set("no_data_timeframe", m.Options.NoDataTimeframe.Get())
 	d.Set("renotify_interval", m.Options.GetRenotifyInterval())
 	d.Set("notify_audit", m.Options.GetNotifyAudit())
 	d.Set("timeout_h", m.Options.GetTimeoutH())
@@ -509,7 +508,7 @@ func resourceDatadogMonitorRead(d *schema.ResourceData, meta interface{}) error 
 
 	// Ignore any timestamps in the past that aren't -1 or 0
 	for k, v := range configSilenced {
-		if v.(int) < int(time.Now().Unix()) && v.(int) != 0 && v.(int) != -1 {
+		if v.(int) < int(providerConf.Now().Unix()) && v.(int) != 0 && v.(int) != -1 {
 			// sync the state with whats in the config so its ignored
 			apiSilenced[k] = int64(v.(int))
 		}
@@ -568,7 +567,7 @@ func resourceDatadogMonitorUpdate(d *schema.ResourceData, meta interface{}) erro
 		for k, _ := range mSilenced {
 			// Since the Datadog GO client doesn't support unmuting on all scopes, loop over GetSilenced() and set the
 			// end timestamp to time.Now().Unix()
-			mSilenced[k] = time.Now().Unix()
+			mSilenced[k] = providerConf.Now().Unix()
 		}
 		monitorResp, _, err = datadogClientV1.MonitorsApi.UpdateMonitor(authV1, i).Body(*m).Execute()
 		if err != nil {
