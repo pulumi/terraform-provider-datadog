@@ -404,11 +404,12 @@ func (r ApiGetIncidentTeamRequest) Execute() (IncidentTeamResponse, *_nethttp.Re
 
 /*
  * GetIncidentTeam Get details of an incident team
- * Get details of an incident team. If the `include[users]` query parameter is provided, the included attribute will contain the users related to these incident teams.
+ * Get details of an incident team. If the `include[users]` query parameter is provided,
+the included attribute will contain the users related to these incident teams.
  * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  * @param teamId The ID of the incident team.
  * @return ApiGetIncidentTeamRequest
- */
+*/
 func (a *IncidentTeamsApiService) GetIncidentTeam(ctx _context.Context, teamId string) ApiGetIncidentTeamRequest {
 	return ApiGetIncidentTeamRequest{
 		ApiService: a,
@@ -577,39 +578,44 @@ func (a *IncidentTeamsApiService) GetIncidentTeamExecute(r ApiGetIncidentTeamReq
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiGetIncidentTeamsRequest struct {
+type ApiListIncidentTeamsRequest struct {
 	ctx        _context.Context
 	ApiService *IncidentTeamsApiService
 	include    *string
 	pageSize   *int64
 	pageOffset *int64
+	filter     *string
 }
 
-func (r ApiGetIncidentTeamsRequest) Include(include string) ApiGetIncidentTeamsRequest {
+func (r ApiListIncidentTeamsRequest) Include(include string) ApiListIncidentTeamsRequest {
 	r.include = &include
 	return r
 }
-func (r ApiGetIncidentTeamsRequest) PageSize(pageSize int64) ApiGetIncidentTeamsRequest {
+func (r ApiListIncidentTeamsRequest) PageSize(pageSize int64) ApiListIncidentTeamsRequest {
 	r.pageSize = &pageSize
 	return r
 }
-func (r ApiGetIncidentTeamsRequest) PageOffset(pageOffset int64) ApiGetIncidentTeamsRequest {
+func (r ApiListIncidentTeamsRequest) PageOffset(pageOffset int64) ApiListIncidentTeamsRequest {
 	r.pageOffset = &pageOffset
 	return r
 }
+func (r ApiListIncidentTeamsRequest) Filter(filter string) ApiListIncidentTeamsRequest {
+	r.filter = &filter
+	return r
+}
 
-func (r ApiGetIncidentTeamsRequest) Execute() (IncidentTeamsResponse, *_nethttp.Response, error) {
-	return r.ApiService.GetIncidentTeamsExecute(r)
+func (r ApiListIncidentTeamsRequest) Execute() (IncidentTeamsResponse, *_nethttp.Response, error) {
+	return r.ApiService.ListIncidentTeamsExecute(r)
 }
 
 /*
- * GetIncidentTeams Get a list of all incident teams
+ * ListIncidentTeams Get a list of all incident teams
  * Get all incident teams for the requesting user's organization. If the `include[users]` query parameter is provided, the included attribute will contain the users related to these incident teams.
  * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @return ApiGetIncidentTeamsRequest
+ * @return ApiListIncidentTeamsRequest
  */
-func (a *IncidentTeamsApiService) GetIncidentTeams(ctx _context.Context) ApiGetIncidentTeamsRequest {
-	return ApiGetIncidentTeamsRequest{
+func (a *IncidentTeamsApiService) ListIncidentTeams(ctx _context.Context) ApiListIncidentTeamsRequest {
+	return ApiListIncidentTeamsRequest{
 		ApiService: a,
 		ctx:        ctx,
 	}
@@ -619,7 +625,7 @@ func (a *IncidentTeamsApiService) GetIncidentTeams(ctx _context.Context) ApiGetI
  * Execute executes the request
  * @return IncidentTeamsResponse
  */
-func (a *IncidentTeamsApiService) GetIncidentTeamsExecute(r ApiGetIncidentTeamsRequest) (IncidentTeamsResponse, *_nethttp.Response, error) {
+func (a *IncidentTeamsApiService) ListIncidentTeamsExecute(r ApiListIncidentTeamsRequest) (IncidentTeamsResponse, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod   = _nethttp.MethodGet
 		localVarPostBody     interface{}
@@ -629,14 +635,14 @@ func (a *IncidentTeamsApiService) GetIncidentTeamsExecute(r ApiGetIncidentTeamsR
 		localVarReturnValue  IncidentTeamsResponse
 	)
 
-	operationId := "GetIncidentTeams"
+	operationId := "ListIncidentTeams"
 	if r.ApiService.client.cfg.IsUnstableOperationEnabled(operationId) {
 		_log.Printf("WARNING: Using unstable operation '%s'", operationId)
 	} else {
 		return localVarReturnValue, nil, GenericOpenAPIError{error: _fmt.Sprintf("Unstable operation '%s' is disabled", operationId)}
 	}
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IncidentTeamsApiService.GetIncidentTeams")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IncidentTeamsApiService.ListIncidentTeams")
 	if err != nil {
 		return localVarReturnValue, nil, GenericOpenAPIError{error: err.Error()}
 	}
@@ -655,6 +661,9 @@ func (a *IncidentTeamsApiService) GetIncidentTeamsExecute(r ApiGetIncidentTeamsR
 	}
 	if r.pageOffset != nil {
 		localVarQueryParams.Add("page[offset]", parameterToString(*r.pageOffset, ""))
+	}
+	if r.filter != nil {
+		localVarQueryParams.Add("filter", parameterToString(*r.filter, ""))
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
@@ -675,7 +684,7 @@ func (a *IncidentTeamsApiService) GetIncidentTeamsExecute(r ApiGetIncidentTeamsR
 	}
 
 	// Set Operation-ID header for telemetry
-	localVarHeaderParams["DD-OPERATION-ID"] = "GetIncidentTeams"
+	localVarHeaderParams["DD-OPERATION-ID"] = "ListIncidentTeams"
 
 	if r.ctx != nil {
 		// API Key Authentication
