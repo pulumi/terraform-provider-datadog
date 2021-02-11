@@ -8,7 +8,7 @@ import (
 
 func resourceDatadogSecurityMonitoringRule() *schema.Resource {
 	return &schema.Resource{
-		Description: "Provides a Datadog Security Monitoring Rule API resource. This can be used to create and manage Datadog security monitoring rules. To change settings for a default rule use datadog_security_default_rule instead.",
+		Description: "Provides a Datadog Security Monitoring Rule API resource. This can be used to create and manage Datadog security monitoring rules. To change settings for a default rule use `datadog_security_default_rule` instead.",
 		Create:      resourceDatadogSecurityMonitoringRuleCreate,
 		Read:        resourceDatadogSecurityMonitoringRuleRead,
 		Update:      resourceDatadogSecurityMonitoringRuleUpdate,
@@ -437,10 +437,7 @@ func buildUpdatePayload(d *schema.ResourceData) datadogV2.SecurityMonitoringRule
 	}
 	payload.Cases = &payloadCases
 
-	if v, ok := d.GetOk("isEnabled"); ok {
-		isEnabled := v.(bool)
-		payload.IsEnabled = &isEnabled
-	}
+	payload.SetIsEnabled(d.Get("enabled").(bool))
 
 	if v, ok := d.GetOk("message"); ok {
 		message := v.(string)

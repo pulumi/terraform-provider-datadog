@@ -57,7 +57,7 @@ func resourceDatadogMonitor() *schema.Resource {
 				},
 			},
 			"query": {
-				Description: "The monitor query to notify on. Note this is not the same query you see in the UI and the syntax is different depending on the monitor type, please see the [API Reference](https://docs.datadoghq.com/api/v1/monitors/#create-a-monitor) for details. Warning: `terraform plan` won't perform any validation of the query contents.",
+				Description: "The monitor query to notify on. Note this is not the same query you see in the UI and the syntax is different depending on the monitor type, please see the [API Reference](https://docs.datadoghq.com/api/v1/monitors/#create-a-monitor) for details. `terraform plan` will validate query contents unless `validate` is set to `false`.",
 				Type:        schema.TypeString,
 				Required:    true,
 				StateFunc: func(val interface{}) string {
@@ -81,7 +81,7 @@ func resourceDatadogMonitor() *schema.Resource {
 				},
 			},
 			"priority": {
-				Description: "",
+				Description: "Integer from 1 (high) to 5 (low) indicating alert severity.",
 				Type:        schema.TypeInt,
 				Optional:    true,
 			},
@@ -132,31 +132,37 @@ func resourceDatadogMonitor() *schema.Resource {
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"ok": {
+							Description:  "The monitor `OK` threshold. Must be a number.",
 							Type:         schema.TypeString,
 							ValidateFunc: validateFloatString,
 							Optional:     true,
 						},
 						"warning": {
+							Description:  "The monitor `WARNING` threshold. Must be a number.",
 							Type:         schema.TypeString,
 							ValidateFunc: validateFloatString,
 							Optional:     true,
 						},
 						"critical": {
+							Description:  "The monitor `CRITICAL` recovery threshold. Must be a number.",
 							Type:         schema.TypeString,
 							ValidateFunc: validateFloatString,
 							Optional:     true,
 						},
 						"unknown": {
+							Description:  "The monitor `UNKNOWN` threshold. Must be a number.",
 							Type:         schema.TypeString,
 							ValidateFunc: validateFloatString,
 							Optional:     true,
 						},
 						"warning_recovery": {
+							Description:  "The monitor `WARNING` recovery threshold. Must be a number.",
 							Type:         schema.TypeString,
 							ValidateFunc: validateFloatString,
 							Optional:     true,
 						},
 						"critical_recovery": {
+							Description:  "The monitor `CRITICAL` recovery threshold. Must be a number.",
 							Type:         schema.TypeString,
 							ValidateFunc: validateFloatString,
 							Optional:     true,
@@ -208,7 +214,7 @@ func resourceDatadogMonitor() *schema.Resource {
 				},
 			},
 			"notify_no_data": {
-				Description: "A boolean indicating whether this monitor will notify when data stops reporting. Defaults to false.",
+				Description: "A boolean indicating whether this monitor will notify when data stops reporting. Defaults to `false`.",
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     false,
@@ -251,27 +257,50 @@ func resourceDatadogMonitor() *schema.Resource {
 				Optional:    true,
 			},
 			"timeout_h": {
-				Description: "The number of hours of the monitor not reporting data before it will automatically resolve from a triggered state. Defaults to `false`.",
+				Description: "The number of hours of the monitor not reporting data before it will automatically resolve from a triggered state.",
 				Type:        schema.TypeInt,
 				Optional:    true,
 			},
 			"require_full_window": {
-				Description: "A boolean indicating whether this monitor needs a full window of data before it's evaluated.\n\nWe highly recommend you set this to `false` for s metrics, otherwise some evaluations will be skipped. Default: `true` for `on average`, `at all times` and `in total` aggregation. `false` otherwise.",
+				Description: "A boolean indicating whether this monitor needs a full window of data before it's evaluated.\n\nWe highly recommend you set this to `false` for sparse metrics, otherwise some evaluations will be skipped. Default: `true` for `on average`, `at all times` and `in total` aggregation. `false` otherwise.",
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     true,
 			},
 			"locked": {
-				Description: "A boolean indicating whether changes to to this monitor should be restricted to the creator or admins. Defaults to `false`.",
-				Type:        schema.TypeBool,
-				Optional:    true,
+				Description:   "A boolean indicating whether changes to to this monitor should be restricted to the creator or admins. Defaults to `false`.",
+				Type:          schema.TypeBool,
+				Optional:      true,
+				ConflictsWith: []string{"restricted_roles"},
+				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
+					// if restricted_roles is defined, ignore locked
+					if _, ok := d.GetOk("restricted_roles"); ok {
+						return true
+					}
+					return false
+				},
+			},
+			"restricted_roles": {
+				// Uncomment when generally available
+				// Description: "A list of role identifiers to associate with the monitor. Cannot be used with `locked`.",
+				Type:          schema.TypeSet,
+				Optional:      true,
+				Elem:          &schema.Schema{Type: schema.TypeString},
+				ConflictsWith: []string{"locked"},
+				DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
+					// if locked is defined, ignore restricted_roles
+					if _, ok := d.GetOk("locked"); ok {
+						return true
+					}
+					return false
+				},
 			},
 			"silenced": {
 				Description: "Each scope will be muted until the given POSIX timestamp or forever if the value is `0`. Use `-1` if you want to unmute the scope. Deprecated: the silenced parameter is being deprecated in favor of the downtime resource. This will be removed in the next major version of the Terraform Provider.",
 				Type:        schema.TypeMap,
 				Optional:    true,
 				Elem:        schema.TypeInt,
-				Deprecated:  "use Downtime Resource instead",
+				Deprecated:  "Use the Downtime resource instead.",
 			},
 			"include_tags": {
 				Description: "A boolean indicating whether notifications from this monitor automatically insert its triggering tags into the title. Defaults to `true`.",
@@ -445,6 +474,17 @@ func buildMonitorStruct(d BuiltResource) (*datadogV1.Monitor, *datadogV1.Monitor
 	u.SetPriority(int64(d.Get("priority").(int)))
 	u.SetOptions(o)
 
+	roles := make([]string, 0)
+	if attr, ok := d.GetOk("restricted_roles"); ok {
+		for _, r := range attr.(*schema.Set).List() {
+			roles = append(roles, r.(string))
+		}
+		sort.Strings(roles)
+		// don't pass an empty array, it's not accepted
+		m.SetRestrictedRoles(roles)
+		u.SetRestrictedRoles(roles)
+	}
+
 	tags := make([]string, 0)
 	if attr, ok := d.GetOk("tags"); ok {
 		for _, s := range attr.(*schema.Set).List() {
@@ -597,6 +637,7 @@ func resourceDatadogMonitorRead(d *schema.ResourceData, meta interface{}) error 
 	d.Set("query", m.GetQuery())
 	d.Set("type", m.GetType())
 	d.Set("priority", m.GetPriority())
+	d.Set("restricted_roles", m.GetRestrictedRoles())
 
 	// Set to deprecated field if that's what is used in the config, otherwise, set in the new field
 	if _, ok := d.GetOk("thresholds"); ok {

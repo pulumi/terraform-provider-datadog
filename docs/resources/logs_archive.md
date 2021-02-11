@@ -13,14 +13,14 @@ Provides a Datadog Logs Archive API resource, which is used to create and manage
 
 ```terraform
 resource "datadog_logs_archive" "my_s3_archive" {
-    name  = "my s3 archive"
-    query = "service:myservice"
-    s3_archive {
-        bucket     = "my-bucket"
-        path       = "/path/foo"
-        account_id = "001234567888"
-        role_name  = "my-role-name"
-    }
+  name  = "my s3 archive"
+  query = "service:myservice"
+  s3_archive {
+    bucket     = "my-bucket"
+    path       = "/path/foo"
+    account_id = "001234567888"
+    role_name  = "my-role-name"
+  }
 }
 ```
 
@@ -33,14 +33,14 @@ resource "datadog_logs_archive" "my_s3_archive" {
 
 ### Optional
 
-- **azure** (Map of String, Optional, Deprecated) Definition of an azure archive.
+- **azure** (Map of String, Optional, Deprecated) Definition of an azure archive. **Deprecated.** Define `azure_archive` list with one element instead.
 - **azure_archive** (Block List, Max: 1) Definition of an azure archive. (see [below for nested schema](#nestedblock--azure_archive))
-- **gcs** (Map of String, Optional, Deprecated) Definition of a GCS archive.
+- **gcs** (Map of String, Optional, Deprecated) Definition of a GCS archive. **Deprecated.** Define `gcs_archive` list with one element instead.
 - **gcs_archive** (Block List, Max: 1) Definition of a GCS archive. (see [below for nested schema](#nestedblock--gcs_archive))
 - **id** (String, Optional) The ID of this resource.
 - **include_tags** (Boolean, Optional) To store the tags in the archive, set the value `true`. If it is set to `false`, the tags will be dropped when the logs are sent to the archive.
 - **rehydration_tags** (List of String, Optional) An array of tags to add to rehydrated logs from an archive.
-- **s3** (Map of String, Optional, Deprecated) Definition of an s3 archive.
+- **s3** (Map of String, Optional, Deprecated) Definition of an s3 archive. **Deprecated.** Define `s3_archive` list with one element instead.
 - **s3_archive** (Block List, Max: 1) Definition of an s3 archive. (see [below for nested schema](#nestedblock--s3_archive))
 
 <a id="nestedblock--azure_archive"></a>
